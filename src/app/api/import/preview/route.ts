@@ -1,40 +1,43 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const form = await req.formData();
-    const file = form.get("file") as File;
+    const formData = await req.formData();
+    const file = formData.get("file") as File;
 
-    if (!file) return NextResponse.json({ preview: [] });
+    if (!file) {
+      return NextResponse.json(
+        { error: "No se recibió archivo" },
+        { status: 400 }
+      );
+    }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    // Convertir el archivo a ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
+
+    // Convertir a Uint8Array (LO QUE EXCELJS SI ACEPTA)
+    const uint8Array = new Uint8Array(arrayBuffer);
+
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(uint8Array); // 👈 AQUÍ está la corrección
 
     const sheet = workbook.worksheets[0];
+    const rows: any[] = [];
 
-    const preview = [];
-    const errores = [];
-
-    sheet.eachRow((row, index) => {
-      if (index === 1) return; // encabezado
-
-      const nombre = row.getCell(1).value?.toString().trim();
-      const unidad = row.getCell(2).value?.toString().trim();
-      const stock = Number(row.getCell(3).value || 0);
-      const stockMinimo = Number(row.getCell(4).value || 0);
-
-      if (!nombre || !unidad) {
-        errores.push({ fila: index, error: "Campos obligatorios vacíos" });
-      }
-
-      preview.push({ nombre, unidad, stock, stockMinimo });
+    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      rows.push({
+        index: rowNumber,
+        values: row.values,
+      });
     });
 
-    return NextResponse.json({ preview, errores });
-  } catch (err) {
-    console.error(err);    
-    return NextResponse.json({ preview: [] });
+    return NextResponse.json({ rows });
+  } catch (error) {
+    console.error("❌ Error leyendo Excel:", error);
+    return NextResponse.json(
+      { error: "Error procesando archivo" },
+      { status: 500 }
+    );
   }
 }
