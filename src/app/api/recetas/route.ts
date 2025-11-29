@@ -94,7 +94,9 @@ export async function DELETE(req: Request) {
   const id = Number(searchParams.get("id"));
 
   try {
-    await prisma.recetaIngrediente.deleteMany({ where: { recetaId: id } });
+    // borrar ingredientes anteriores
+await prisma.ingrediente.deleteMany({ where: { recetaId: id } });
+
 
     await prisma.receta.delete({ where: { id } });
 
