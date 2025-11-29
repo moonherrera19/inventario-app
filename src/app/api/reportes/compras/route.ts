@@ -3,10 +3,6 @@ import { prisma } from "@/lib/prisma";
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
 
-// ============================================================
-// GET → Generar PDF o Excel según ?format=pdf|excel
-// ============================================================
-
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -21,13 +17,15 @@ export async function GET(req: Request) {
     });
 
     // ============================================================
-    //  PDF
+    // PDF
     // ============================================================
     if (format === "pdf") {
       const doc = new PDFDocument({ size: "A4", margin: 40 });
+
       const chunks: Buffer[] = [];
 
-      doc.on("data", (chunk) => chunks.push(chunk));
+      // FIX: Tipar chunk como Buffer para TypeScript
+      doc.on("data", (chunk: Buffer) => chunks.push(chunk));
       doc.on("end", () => {});
 
       // TÍTULO
@@ -76,7 +74,6 @@ Fecha: ${new Date(c.fecha).toLocaleString()}
 
       doc.end();
 
-      // Esperar a que PDFKit termine
       await new Promise<void>((resolve) => doc.on("end", resolve));
 
       const pdfBuffer = Buffer.concat(chunks);
@@ -91,7 +88,7 @@ Fecha: ${new Date(c.fecha).toLocaleString()}
     }
 
     // ============================================================
-    //  EXCEL
+    // EXCEL
     // ============================================================
     if (format === "excel") {
       const workbook = new ExcelJS.Workbook();
@@ -106,7 +103,6 @@ Fecha: ${new Date(c.fecha).toLocaleString()}
         { header: "Fecha", key: "fecha", width: 25 },
       ];
 
-      // Estilo encabezado
       sheet.getRow(1).eachCell((cell) => {
         cell.fill = {
           type: "pattern",
