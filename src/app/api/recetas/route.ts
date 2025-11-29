@@ -62,7 +62,8 @@ export async function PUT(req: Request) {
     const { id, nombre, ingredientes } = await req.json();
 
     // borrar ingredientes anteriores
-    await prisma.recetaIngrediente.deleteMany({ where: { recetaId: id } });
+  await prisma.ingrediente.deleteMany({ where: { recetaId: id } });
+
 
     const receta = await prisma.receta.update({
       where: { id },
