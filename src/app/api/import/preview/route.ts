@@ -15,16 +15,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Obtener el ArrayBuffer
+    // Convertir archivo → ArrayBuffer → Uint8Array
     const arrayBuffer = await file.arrayBuffer();
+    const uint8 = new Uint8Array(arrayBuffer); // ✔ compatible 100% con Vercel
 
-    // Convertir correctamente → Buffer real compatible con ExcelJS
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const buffer = Buffer.from(uint8Array.buffer); // 👈 ESTA ES LA CORRECTA
-
-    // Crear workbook y cargar el archivo
+    // Cargar Excel usando Uint8Array (NO buffer)
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(uint8); // ✔ ESTA ES LA CLAVE
 
     const sheet = workbook.worksheets[0];
     const rows: any[] = [];
