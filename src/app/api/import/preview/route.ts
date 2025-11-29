@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 
+export const runtime = "nodejs"; // 👈 OBLIGATORIO para permitir Buffer en Vercel
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -13,14 +15,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Convertir el archivo a ArrayBuffer
+    // Obtener ArrayBuffer del archivo
     const arrayBuffer = await file.arrayBuffer();
 
-    // Convertir a Uint8Array (LO QUE EXCELJS SI ACEPTA)
-    const uint8Array = new Uint8Array(arrayBuffer);
+    // Convertir ArrayBuffer → Buffer Node
+    const buffer = Buffer.from(arrayBuffer); // 👈 ESTA es la forma correcta
 
+    // Ahora sí cargar workbook
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(uint8Array); // 👈 AQUÍ está la corrección
+    await workbook.xlsx.load(buffer);
 
     const sheet = workbook.worksheets[0];
     const rows: any[] = [];
