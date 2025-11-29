@@ -15,13 +15,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Convertir archivo → ArrayBuffer → Uint8Array
+    // Obtener ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
-    const uint8 = new Uint8Array(arrayBuffer); // ✔ compatible 100% con Vercel
 
-    // Cargar Excel usando Uint8Array (NO buffer)
+    // Forzar TS a tratarlo como Uint8Array válido
+    const uint8 = new Uint8Array(arrayBuffer) as unknown as Uint8Array;
+
+    // Crear workbook y cargar el archivo
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(uint8); // ✔ ESTA ES LA CLAVE
+
+    // 👈 ESTA LÍNEA YA NO FALLA
+    await workbook.xlsx.load(uint8);
 
     const sheet = workbook.worksheets[0];
     const rows: any[] = [];
