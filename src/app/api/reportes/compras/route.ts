@@ -4,15 +4,10 @@ import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
 
 // ============================================================
-// GET → Generar PDF o Excel según el parámetro ?format=
-// ============================================================
-//
-// Ejemplos:
-// /api/reportes/compras?format=pdf
-// /api/reportes/compras?format=excel
+// GET → Generar PDF o Excel según ?format=pdf|excel
 // ============================================================
 
-export async function GET(req) {
+export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const format = searchParams.get("format") || "pdf";
@@ -25,26 +20,15 @@ export async function GET(req) {
       },
     });
 
-    // ===========================
-    //  GENERAR PDF
-    // ===========================
+    // ============================================================
+    //  PDF
+    // ============================================================
     if (format === "pdf") {
-      const doc = new PDFDocument({
-        size: "A4",
-        margin: 40,
-      });
+      const doc = new PDFDocument({ size: "A4", margin: 40 });
+      const chunks: Buffer[] = [];
 
-      const chunks = [];
       doc.on("data", (chunk) => chunks.push(chunk));
-      doc.on("end", () =>
-        new NextResponse(Buffer.concat(chunks), {
-          status: 200,
-          headers: {
-            "Content-Type": "application/pdf",
-            "Content-Disposition": "attachment; filename=compras.pdf",
-          },
-        })
-      );
+      doc.on("end", () => {});
 
       // TÍTULO
       doc
@@ -54,7 +38,6 @@ export async function GET(req) {
 
       doc.moveDown();
 
-      // ENCABEZADO
       doc
         .fontSize(12)
         .fillColor("#FFFFFF")
@@ -62,32 +45,29 @@ export async function GET(req) {
 
       doc.moveDown();
 
-      // TABLA
       doc.fontSize(13).fillColor("#0DE67B").text("Listado de Compras:", {
         underline: true,
       });
 
       doc.moveDown(0.5);
-
       doc.fontSize(10).fillColor("#FFFFFF");
 
       let totalGeneral = 0;
 
       compras.forEach((c) => {
-        const linea = `
+        totalGeneral += Number(c.costo);
+
+        doc.text(`
 Producto: ${c.producto?.nombre}
 Proveedor: ${c.proveedor?.nombre}
 Cantidad: ${c.cantidad}
 Costo: $${c.costo}
 Fecha: ${new Date(c.fecha).toLocaleString()}
 -----------------------------------------------
-`;
-
-        totalGeneral += Number(c.costo);
-        doc.text(linea);
+`);
       });
 
-      // TOTAL FINAL
+      // TOTAL
       doc.moveDown();
       doc
         .fontSize(14)
@@ -95,7 +75,13 @@ Fecha: ${new Date(c.fecha).toLocaleString()}
         .text("Total gastado: $" + totalGeneral.toFixed(2));
 
       doc.end();
-      return new Response(Buffer.concat(chunks), {
+
+      // Esperar a que PDFKit termine
+      await new Promise<void>((resolve) => doc.on("end", resolve));
+
+      const pdfBuffer = Buffer.concat(chunks);
+
+      return new NextResponse(pdfBuffer, {
         status: 200,
         headers: {
           "Content-Type": "application/pdf",
@@ -104,14 +90,13 @@ Fecha: ${new Date(c.fecha).toLocaleString()}
       });
     }
 
-    // ===========================
-    //  GENERAR EXCEL
-    // ===========================
+    // ============================================================
+    //  EXCEL
+    // ============================================================
     if (format === "excel") {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Compras");
 
-      // ENCABEZADOS
       sheet.columns = [
         { header: "ID", key: "id", width: 10 },
         { header: "Producto", key: "producto", width: 30 },
@@ -121,28 +106,18 @@ Fecha: ${new Date(c.fecha).toLocaleString()}
         { header: "Fecha", key: "fecha", width: 25 },
       ];
 
-      // ESTILO ENCABEZADO
+      // Estilo encabezado
       sheet.getRow(1).eachCell((cell) => {
         cell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "FF065F2B" }, // VERDE OSCURO PRO
+          fgColor: { argb: "FF065F2B" },
         };
-        cell.font = {
-          color: { argb: "FFFFFFFF" },
-          bold: true,
-        };
-        cell.border = {
-          top: { style: "thin", color: { argb: "FFFFFFFF" } },
-          left: { style: "thin", color: { argb: "FFFFFFFF" } },
-          bottom: { style: "thin", color: { argb: "FFFFFFFF" } },
-          right: { style: "thin", color: { argb: "FFFFFFFF" } },
-        };
+        cell.font = { color: { argb: "FFFFFFFF" }, bold: true };
       });
 
       let totalGeneral = 0;
 
-      // FILAS
       compras.forEach((c) => {
         totalGeneral += Number(c.costo);
 
@@ -156,7 +131,6 @@ Fecha: ${new Date(c.fecha).toLocaleString()}
         });
       });
 
-      // TOTAL
       const totalRow = sheet.addRow({
         producto: "TOTAL GENERAL",
         costo: totalGeneral.toFixed(2),
@@ -177,7 +151,7 @@ Fecha: ${new Date(c.fecha).toLocaleString()}
     }
 
     return NextResponse.json(
-      { error: "Formato no válido (usa pdf o excel)" },
+      { error: "Formato no válido (usa ?format=pdf o excel)" },
       { status: 400 }
     );
   } catch (error) {
