@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 
-export const runtime = "nodejs"; // 👈 NECESARIO para habilitar Buffer real en Vercel
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,12 +15,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Convertir arrayBuffer → Buffer real compatible con ExcelJS
+    // Obtener el ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const buffer = Buffer.from(uint8Array); // 👈 FIX DEFINITIVO
 
-    // Cargar el Excel
+    // Convertir correctamente → Buffer real compatible con ExcelJS
+    const uint8Array = new Uint8Array(arrayBuffer);
+    const buffer = Buffer.from(uint8Array.buffer); // 👈 ESTA ES LA CORRECTA
+
+    // Crear workbook y cargar el archivo
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
 
