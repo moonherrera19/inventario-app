@@ -41,10 +41,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // ❗ NO AFECTA INVENTARIO  
-    // ❗ NO SUMA STOCK  
-    // ❗ SOLO REGISTRA GASTO  
-
     return NextResponse.json(newCompra);
   } catch (error) {
     console.error("❌ Error POST compras:", error);
