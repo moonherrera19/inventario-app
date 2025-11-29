@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
+import { prisma } from "@/lib/prisma";
 
-export async function POST(req: Request) {
+export const runtime = "nodejs";
+
+export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File;
@@ -14,71 +16,52 @@ export async function POST(req: Request) {
       );
     }
 
-    // leer buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
+    // Convertir archivo a ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
 
+    // Convertir a ReadableStream compatible con Vercel
+    const readable = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(arrayBuffer));
+        controller.close();
+      },
+    });
+
+    // Leer Excel
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.read(readable as any);
 
     const sheet = workbook.worksheets[0];
+    const productos: any[] = [];
 
-    const productos = [];
-    const errores = [];
+    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return; // saltar encabezado
 
-    sheet.eachRow((row, index) => {
-      if (index === 1) return; // saltar encabezado
-
-      const nombre = row.getCell(1).value?.toString().trim();
-      const unidad = row.getCell(2).value?.toString().trim();
-      const stock = Number(row.getCell(3).value || 0);
-      const stockMinimo = Number(row.getCell(4).value || 0);
-
-      if (!nombre || !unidad) {
-        errores.push({
-          fila: index,
-          error: "Nombre o unidad vacíos",
-        });
-        return;
-      }
+      const values = row.values as any[];
 
       productos.push({
-        nombre,
-        unidad,
-        stock,
-        stockMinimo,
+        nombre: values[1] || "",
+        categoriaId: Number(values[2]) || null,
+        unidad: values[3] || "",
+        stock: Number(values[4]) || 0,
       });
     });
 
-    if (errores.length > 0) {
-      return NextResponse.json({ errores }, { status: 400 });
-    }
-
-    // evitar duplicados por nombre
-    const nombres = productos.map((p) => p.nombre);
-    const existentes = await prisma.producto.findMany({
-      where: { nombre: { in: nombres } },
-    });
-
-    const duplicados = existentes.map((p) => p.nombre);
-
-    if (duplicados.length > 0) {
-      return NextResponse.json(
-        { error: "Duplicados detectados", duplicados },
-        { status: 400 }
-      );
-    }
-
-    // insertar en prisma
-    await prisma.producto.createMany({
+    // Inserción masiva
+    const inserted = await prisma.producto.createMany({
       data: productos,
       skipDuplicates: true,
     });
 
-    return NextResponse.json({ ok: true, insertados: productos.length });
-  } catch (err) {
-    console.error("Error importando:", err);
+    return NextResponse.json({
+      message: "Importación completada",
+      insertados: inserted.count,
+      productos,
+    });
+  } catch (error) {
+    console.error("❌ Error importando productos:", error);
     return NextResponse.json(
-      { error: "Error interno al importar" },
+      { error: "Error procesando archivo" },
       { status: 500 }
     );
   }
