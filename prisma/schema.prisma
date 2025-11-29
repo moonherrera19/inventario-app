@@ -1,0 +1,163 @@
+// ========================================================
+//   SCHEMA PRISMA — INVENTARIO AGRÍCOLA PROFESIONAL
+// ========================================================
+
+// ---- CONFIGURACIÓN ----
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ========================================================
+// ROLES Y USUARIOS
+// ========================================================
+
+model Rol {
+  id       Int       @id @default(autoincrement())
+  nombre   String    @unique
+  usuarios Usuario[]
+}
+
+model Usuario {
+  id       Int    @id @default(autoincrement())
+  nombre   String
+  correo   String @unique
+  password String
+  rolId    Int
+
+  rol      Rol      @relation(fields: [rolId], references: [id])
+  creadoEn DateTime @default(now())
+}
+
+// ========================================================
+// CATÁLOGOS
+// ========================================================
+
+model Categoria {
+  id        Int        @id @default(autoincrement())
+  nombre    String
+  descripcion String?
+  productos Producto[]
+}
+
+model Proveedor {
+  id        Int       @id @default(autoincrement())
+  nombre    String
+  telefono  String?
+  direccion String?
+  productos Producto[]   // ← añadido
+  compras   Compra[]
+}
+
+// ========================================================
+// PRODUCTOS DEL INVENTARIO
+// ========================================================
+
+model Producto {
+  id            Int     @id @default(autoincrement())
+  nombre        String
+  unidad        String
+  categoriaId   Int?
+  proveedorId   Int?    // ← añadido
+  precioUnitario Float? // ← añadido (para costo por hectárea)
+  stock         Float   @default(0)
+  stockMinimo   Float   @default(0) // ← añadido
+
+  categoria     Categoria? @relation(fields: [categoriaId], references: [id])
+  proveedor     Proveedor? @relation(fields: [proveedorId], references: [id])
+
+  entradas      Entrada[]
+  salidas       Salida[]
+  compras       Compra[]
+  ingredientes  Ingrediente[]
+  consumos      Consumo[]
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt // ← añadido
+}
+
+// ========================================================
+// MOVIMIENTOS
+// ========================================================
+
+model Entrada {
+  id         Int      @id @default(autoincrement())
+  productoId Int
+  cantidad   Float
+  fecha      DateTime @default(now())
+
+  producto Producto @relation(fields: [productoId], references: [id])
+}
+
+model Salida {
+  id         Int      @id @default(autoincrement())
+  productoId Int
+  cantidad   Float
+  fecha      DateTime @default(now())
+
+  producto Producto @relation(fields: [productoId], references: [id])
+}
+
+// ========================================================
+// COMPRAS
+// ========================================================
+
+model Compra {
+  id          Int      @id @default(autoincrement())
+  productoId  Int
+  proveedorId Int
+  costo       Float
+  cantidad    Float
+  fecha       DateTime @default(now())
+
+  producto  Producto  @relation(fields: [productoId], references: [id])
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id])
+}
+
+// ========================================================
+// RECETAS — MEZCLAS AGRÍCOLAS / ALIMENTOS / FERTILIZANTES
+// ========================================================
+
+model Receta {
+  id           Int           @id @default(autoincrement())
+  nombre       String
+  ingredientes Ingrediente[]
+}
+
+model Ingrediente {
+  id         Int   @id @default(autoincrement())
+  recetaId   Int
+  productoId Int
+  cantidad   Float
+
+  receta   Receta   @relation(fields: [recetaId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
+}
+
+// ========================================================
+// REGISTROS AGRÍCOLAS PROFESIONALES
+// ========================================================
+
+model Lote {
+  id      Int     @id @default(autoincrement())
+  nombre  String
+  cultivo String?
+  areaHa  Float?
+
+  consumos Consumo[]
+}
+
+model Consumo {
+  id         Int      @id @default(autoincrement())
+  loteId     Int
+  productoId Int
+  cantidad   Float
+  fecha      DateTime @default(now())
+
+  lote     Lote     @relation(fields: [loteId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
+}
