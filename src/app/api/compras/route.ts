@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
@@ -21,7 +21,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req) {
+export async function POST(req: NextRequest) {
   try {
     const { productoId, proveedorId, cantidad, costo } = await req.json();
 
