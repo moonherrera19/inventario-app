@@ -1,89 +1,83 @@
 "use client";
 
-import { useState } from "react";
+interface ModalIngredienteProps {
+  open: boolean;
+  onClose: () => void;
+  productos: any[];
+  ingredientesActuales: any[];
+  onAdd: (ingrediente: any) => void;
+}
 
 export default function ModalIngrediente({
   open,
   onClose,
   productos,
   ingredientesActuales,
-  onAddIngrediente,
-}) {
-
-  const [productoId, setProductoId] = useState("");
-  const [cantidad, setCantidad] = useState("");
-
+  onAdd,
+}: ModalIngredienteProps) {
   if (!open) return null;
 
-  const handleAdd = () => {
-    if (!productoId) return alert("Selecciona un producto");
-    if (!cantidad || cantidad <= 0) return alert("Ingresa una cantidad válida");
-
-    const producto = productos.find((p) => p.id === Number(productoId));
-
-    onAddIngrediente({
-      productoId: Number(productoId),
-      cantidad: Number(cantidad),
-      productoNombre: producto?.nombre || "",
-    });
-
-    setProductoId("");
-    setCantidad("");
-    onClose();
-  };
-
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[99999] px-4">
-      <div className="bg-[#102015] w-full max-w-md p-6 rounded-xl border border-green-700">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-[#0f1217] p-6 rounded-xl border border-green-700 w-full max-w-lg text-white">
 
-        <h2 className="text-xl font-bold text-green-300 mb-4 text-center">
-          Añadir ingrediente
+        <h2 className="text-xl font-bold text-green-400 mb-4">
+          Agregar ingrediente
         </h2>
 
-        {/* Select de productos */}
-        <label className="text-sm text-green-200 mb-1 block">Producto</label>
         <select
-          className="w-full bg-[#142017] border border-green-700 text-white p-2 rounded-lg mb-4"
-          value={productoId}
-          onChange={(e) => setProductoId(e.target.value)}
+          className="bg-[#1a1f25] border border-green-700 p-2 rounded w-full mb-4"
+          id="producto"
         >
-          <option value="">Selecciona un producto...</option>
-
-          {productos.length > 0 ? (
-            productos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))
-          ) : (
-            <option disabled>No hay productos cargados</option>
-          )}
+          <option value="">Selecciona un producto</option>
+          {productos.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nombre}
+            </option>
+          ))}
         </select>
 
-        {/* Cantidad */}
-        <label className="text-sm text-green-200 mb-1 block">Cantidad</label>
         <input
           type="number"
-          className="w-full bg-[#142017] border border-green-700 text-white p-2 rounded-lg"
-          placeholder="Ej. 2"
-          value={cantidad}
-          onChange={(e) => setCantidad(e.target.value)}
+          placeholder="Cantidad"
+          className="bg-[#1a1f25] border border-green-700 p-2 rounded w-full mb-4"
+          id="cantidad"
         />
 
-        {/* Botones */}
-        <div className="flex justify-between mt-6">
+        <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+            className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600"
           >
             Cancelar
           </button>
 
           <button
-            onClick={handleAdd}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+            onClick={() => {
+              const prodSelect = document.getElementById(
+                "producto"
+              ) as HTMLSelectElement;
+
+              const cantInput = document.getElementById(
+                "cantidad"
+              ) as HTMLInputElement;
+
+              if (!prodSelect.value || !cantInput.value) {
+                alert("Completa todos los campos");
+                return;
+              }
+
+              const ingrediente = {
+                productoId: Number(prodSelect.value),
+                cantidad: Number(cantInput.value),
+              };
+
+              onAdd(ingrediente);
+              onClose();
+            }}
+            className="px-4 py-2 bg-green-600 rounded hover:bg-green-700"
           >
-            Añadir
+            Agregar
           </button>
         </div>
       </div>
