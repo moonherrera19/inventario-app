@@ -33,14 +33,15 @@ export default function RecetaModal({
     }
 
     startTransition(async () => {
-      const data = { nombre, ingredientes };
+      // 👇 Corrección: data como any para permitir id dinámico
+      let data: any = { nombre, ingredientes };
 
       let url = "/api/recetas";
       let method = "POST";
 
       if (editData) {
         method = "PUT";
-        data["id"] = editData.id;
+        data.id = editData.id; // ya no marca error
       }
 
       const res = await fetch(url, {
