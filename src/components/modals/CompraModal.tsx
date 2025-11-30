@@ -2,7 +2,13 @@
 
 import { useState, useTransition } from "react";
 
-export default function ModalCompra({ open, onClose, productos = [], proveedores = [] }) {
+export default function ModalCompra({
+  open,
+  onClose,
+  onSuccess,          // 🔥 PROPIEDAD AGREGADA
+  productos = [],
+  proveedores = [],
+}) {
   const [productoId, setProductoId] = useState("");
   const [proveedorId, setProveedorId] = useState("");
   const [cantidad, setCantidad] = useState("");
@@ -22,7 +28,7 @@ export default function ModalCompra({ open, onClose, productos = [], proveedores
     setSuccess("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: any) => {
     e.preventDefault();
 
     setError("");
@@ -61,9 +67,12 @@ export default function ModalCompra({ open, onClose, productos = [], proveedores
         setSuccess("Compra registrada correctamente.");
         resetForm();
 
+        // 🔥🔥🔥 LLAMAR onSuccess PARA ACTUALIZAR TABLA
+        if (onSuccess) onSuccess();
+
         setTimeout(() => {
           onClose();
-        }, 1000);
+        }, 500);
       } catch (err) {
         setError("Error inesperado. Intenta nuevamente.");
       }
@@ -94,7 +103,7 @@ export default function ModalCompra({ open, onClose, productos = [], proveedores
               className="w-full rounded-lg p-2 bg-[#142017] border border-green-700 text-white focus:outline-none"
             >
               <option value="">Selecciona un producto</option>
-              {productos.map((p) => (
+              {productos.map((p: any) => (
                 <option key={p.id} value={p.id}>
                   {p.nombre}
                 </option>
@@ -113,7 +122,7 @@ export default function ModalCompra({ open, onClose, productos = [], proveedores
               className="w-full rounded-lg p-2 bg-[#142017] border border-green-700 text-white focus:outline-none"
             >
               <option value="">Selecciona un proveedor</option>
-              {proveedores.map((pr) => (
+              {proveedores.map((pr: any) => (
                 <option key={pr.id} value={pr.id}>
                   {pr.nombre}
                 </option>
