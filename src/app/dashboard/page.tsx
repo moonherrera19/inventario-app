@@ -11,8 +11,16 @@ import CategoriasDonut from "@/components/dashboard/charts/CategoriasDonut";
 import ProveedoresBar from "@/components/dashboard/charts/ProveedoresBar";
 import TopProductos from "@/components/dashboard/charts/TopProductos";
 
+// ⭐ Tipo seguro para stats
+const statsDefault = {
+  totalProductos: 0,
+  stockBajo: 0,
+  valorInventario: 0,
+  comprasMes: 0,
+};
+
 export default function Dashboard() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState(statsDefault);
   const [categorias, setCategorias] = useState([]);
   const [proveedores, setProveedores] = useState([]);
   const [topProductos, setTopProductos] = useState([]);
@@ -25,16 +33,13 @@ export default function Dashboard() {
     fetch("/api/dashboard/charts/topProductos").then((r) => r.json()).then(setTopProductos);
   }, []);
 
-  if (!stats)
-    return <p className="text-white text-lg p-6">Cargando dashboard...</p>;
-
   // ==============================
   // GRAFICA PRINCIPAL YA SIN ENTRADAS/SALIDAS
   // ==============================
   const dias = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
   const dataGrafica = dias.map((dia) => ({
     dia,
-    entradas: 0, // módulos eliminados
+    entradas: 0,
     salidas: 0,
   }));
 
@@ -50,23 +55,23 @@ export default function Dashboard() {
 
         <KpiCard
           title="Productos Totales"
-          value={stats.totalProductos ?? 0}
+          value={stats.totalProductos}
         />
 
         <KpiCard
           title="Stock Bajo"
-          value={stats.stockBajo ?? 0}
+          value={stats.stockBajo}
           color="red"
         />
 
         <KpiCard
           title="Valor Total Inventario"
-          value={`$${(stats.valorInventario ?? 0).toFixed(2)}`}
+          value={`$${stats.valorInventario.toFixed(2)}`}
         />
 
         <KpiCard
           title="Gasto en Compras (Mes)"
-          value={`$${(stats.comprasMes ?? 0).toFixed(2)}`}
+          value={`$${stats.comprasMes.toFixed(2)}`}
         />
 
       </div>
