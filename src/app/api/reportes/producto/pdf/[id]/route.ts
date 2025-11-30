@@ -1,5 +1,3 @@
-// app/api/reportes/producto/pdf/[id]/route.ts
-
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -12,7 +10,6 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-
     const numericId = Number(id);
 
     if (!numericId) {
@@ -37,7 +34,8 @@ export async function GET(
     const doc = new PDFDocument({ margin: 40 });
     const chunks: Buffer[] = [];
 
-    doc.on("data", (c) => chunks.push(c));
+    // FIX: tipar c como Buffer
+    doc.on("data", (c: Buffer) => chunks.push(c));
     doc.on("end", () => {});
 
     doc
