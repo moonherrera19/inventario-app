@@ -4,7 +4,7 @@ export async function generarPdfRecetas(recetas: any[]) {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
 
-  recetas.forEach((rec) => {
+  recetas.forEach((rec: any) => {
     const page = pdf.addPage([900, 1200]);
     let y = 1120;
 
@@ -28,7 +28,7 @@ export async function generarPdfRecetas(recetas: any[]) {
 
     y -= 25;
 
-    rec.ingredientes.forEach((ing) => {
+    rec.ingredientes.forEach((ing: any) => {
       page.drawText(
         `• ${ing.producto?.nombre} — ${ing.cantidad} ${ing.producto?.unidad}`,
         { x: 70, y, size: 14, font }
