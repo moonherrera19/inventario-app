@@ -1,5 +1,6 @@
-
 // app/api/reportes/lote/pdf/[id]/route.ts
+
+export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -14,14 +15,12 @@ export async function GET(req: Request, { params }) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
-    // Buscar lote con consumos y productos
+    // Obtener lote
     const lote = await prisma.lote.findUnique({
       where: { id: loteId },
       include: {
         consumos: {
-          include: {
-            producto: true,
-          },
+          include: { producto: true },
         },
       },
     });
@@ -35,69 +34,49 @@ export async function GET(req: Request, { params }) {
 
     // Iniciar PDF
     const { pdfDoc, page, width, height, font } = await crearPDFBase();
+    let currentPage = page; // IMPORTANTE
     let y = height - 120;
 
     // Título
-    page.drawText(`REPORTE DE LOTE`, {
-      x: 20,
-      y,
-      size: 18,
-      font,
-      color: rgb(0, 0.5, 0.2),
+    currentPage.drawText(`REPORTE DE LOTE`, {
+      x: 20, y, size: 18, font, color: rgb(0, 0.5, 0.2),
     });
 
     y -= 30;
 
-    // Información del lote
-    page.drawText(`Nombre del lote: ${lote.nombre}`, {
-      x: 20,
-      y,
-      size: 14,
-      font,
+    currentPage.drawText(`Nombre del lote: ${lote.nombre}`, {
+      x: 20, y, size: 14, font,
     });
 
     y -= 20;
 
-    page.drawText(`Cultivo: ${lote.cultivo || "No especificado"}`, {
-      x: 20,
-      y,
-      size: 14,
-      font,
+    currentPage.drawText(`Cultivo: ${lote.cultivo || "No especificado"}`, {
+      x: 20, y, size: 14, font,
     });
 
     y -= 20;
 
-    page.drawText(`Área: ${lote.areaHa ?? 0} ha`, {
-      x: 20,
-      y,
-      size: 14,
-      font,
+    currentPage.drawText(`Área: ${lote.areaHa ?? 0} ha`, {
+      x: 20, y, size: 14, font,
     });
 
     y -= 40;
 
-    // 🧾 Tabla de consumos
-    page.drawText(`CONSUMOS AGRÍCOLAS`, {
-      x: 20,
-      y,
-      size: 16,
-      font,
-      color: rgb(0.1, 0.4, 0.2),
+    // Encabezado de consumos
+    currentPage.drawText(`CONSUMOS AGRÍCOLAS`, {
+      x: 20, y, size: 16, font, color: rgb(0.1, 0.4, 0.2),
     });
 
     y -= 25;
 
+    // Si no tiene consumos
     if (lote.consumos.length === 0) {
-      page.drawText("Este lote no tiene consumos registrados.", {
-        x: 20,
-        y,
-        size: 12,
-        font,
-        color: rgb(0.4, 0.4, 0.4),
+      currentPage.drawText("Este lote no tiene consumos registrados.", {
+        x: 20, y, size: 12, font, color: rgb(0.4, 0.4, 0.4),
       });
 
       const pdfBytes = await pdfDoc.save();
-      return new NextResponse(pdfBytes, {
+      return new NextResponse(Buffer.from(pdfBytes), {
         status: 200,
         headers: {
           "Content-Type": "application/pdf",
@@ -107,14 +86,13 @@ export async function GET(req: Request, { params }) {
     }
 
     // Encabezado tabla
-    page.drawText("Producto", { x: 20, y, size: 12, font });
-    page.drawText("Cantidad", { x: 180, y, size: 12, font });
-    page.drawText("Costo Estimado", { x: 300, y, size: 12, font });
+    currentPage.drawText("Producto", { x: 20, y, size: 12, font });
+    currentPage.drawText("Cantidad", { x: 180, y, size: 12, font });
+    currentPage.drawText("Costo Estimado", { x: 300, y, size: 12, font });
 
     y -= 15;
 
-    // Línea separadora
-    page.drawLine({
+    currentPage.drawLine({
       start: { x: 20, y },
       end: { x: width - 20, y },
       thickness: 1,
@@ -125,26 +103,33 @@ export async function GET(req: Request, { params }) {
 
     let costoTotal = 0;
 
-    lote.consumos.forEach((consumo) => {
+    // Iterar consumos
+    for (const consumo of lote.consumos) {
       const producto = consumo.producto;
       const precioUnitario = producto.precioUnitario || 0;
       const costo = precioUnitario * consumo.cantidad;
-
       costoTotal += costo;
 
-      page.drawText(producto.nombre, { x: 20, y, size: 12, font });
+      // Nueva página
+      if (y < 80) {
+        currentPage = pdfDoc.addPage([595.28, 841.89]);
+        y = 800;
 
-      page.drawText(`${consumo.cantidad}`, {
-        x: 180,
-        y,
-        size: 12,
-        font,
+        currentPage.drawText("Producto", { x: 20, y, size: 12, font });
+        currentPage.drawText("Cantidad", { x: 180, y, size: 12, font });
+        currentPage.drawText("Costo Estimado", { x: 300, y, size: 12, font });
+
+        y -= 20;
+      }
+
+      currentPage.drawText(producto.nombre, { x: 20, y, size: 12, font });
+
+      currentPage.drawText(`${consumo.cantidad}`, {
+        x: 180, y, size: 12, font,
       });
 
-      page.drawText(
-        precioUnitario
-          ? `$${costo.toFixed(2)}`
-          : "Sin precio definido",
+      currentPage.drawText(
+        precioUnitario ? `$${costo.toFixed(2)}` : "Sin precio definido",
         {
           x: 300,
           y,
@@ -155,18 +140,12 @@ export async function GET(req: Request, { params }) {
       );
 
       y -= 20;
-
-      // Nueva página si se llena
-      if (y < 80) {
-        const newPage = pdfDoc.addPage([595.28, 841.89]);
-        y = 800;
-      }
-    });
+    }
 
     y -= 30;
 
-    // TOTAL
-    page.drawLine({
+    // Total
+    currentPage.drawLine({
       start: { x: 20, y },
       end: { x: width - 20, y },
       thickness: 1.5,
@@ -175,15 +154,11 @@ export async function GET(req: Request, { params }) {
 
     y -= 20;
 
-    page.drawText(`Costo Total Estimado del Lote:`, {
-      x: 20,
-      y,
-      size: 14,
-      font,
-      color: rgb(0, 0.4, 0.1),
+    currentPage.drawText(`Costo Total Estimado del Lote:`, {
+      x: 20, y, size: 14, font, color: rgb(0, 0.4, 0.1),
     });
 
-    page.drawText(
+    currentPage.drawText(
       costoTotal > 0 ? `$${costoTotal.toFixed(2)}` : "Sin datos suficientes",
       {
         x: 280,
@@ -196,13 +171,14 @@ export async function GET(req: Request, { params }) {
 
     const pdfBytes = await pdfDoc.save();
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="lote_${loteId}.pdf"`,
       },
     });
+
   } catch (error) {
     console.error("❌ Error PDF lote:", error);
     return NextResponse.json(
