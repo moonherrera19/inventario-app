@@ -3,115 +3,82 @@
 import { useState } from "react";
 import * as XLSX from "xlsx";
 
-export default function ModalImportProductos({ isOpen, onClose, onImported }) {
-  const [file, setFile] = useState(null);
+interface ModalImportProductosProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onImported: (rows: any[]) => void;
+}
+
+export default function ModalImportProductos({
+  isOpen,
+  onClose,
+  onImported,
+}: ModalImportProductosProps) {
+  const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any[]>([]);
 
-  const leerExcel = async (archivo: File) => {
-    const data = await archivo.arrayBuffer();
-    const workbook = XLSX.read(data);
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet);
-
-    setPreview(json);
-  };
-
   const handleFile = (e: any) => {
-    const archivo = e.target.files[0];
-    setFile(archivo);
-    leerExcel(archivo);
+    const f = e.target.files?.[0];
+    setFile(f);
+
+    if (f) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet);
+        setPreview(rows);
+      };
+      reader.readAsArrayBuffer(f);
+    }
   };
 
-  const importar = async () => {
-    if (!preview.length) return alert("No hay datos para importar");
-
-    const res = await fetch("/api/import/productos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(preview),
-    });
-
-    if (res.ok) {
-      alert("Productos importados correctamente");
-      onImported();
-      onClose();
-    } else {
-      alert("Error al importar");
+  const importar = () => {
+    if (!preview.length) {
+      alert("No hay datos para importar.");
+      return;
     }
+
+    onImported(preview);
+    onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-[#0f1217] border border-green-700 p-6 rounded-xl w-full max-w-lg text-white">
 
-      <div className="bg-[#111418] w-full max-w-3xl rounded-xl shadow-xl border border-green-900/40 overflow-hidden max-h-[90vh] flex flex-col">
+        <h2 className="text-xl font-bold mb-4 text-green-400">Importar Productos</h2>
 
-        {/* HEADER */}
-        <div className="p-4 border-b border-green-900/40 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-green-300">
-            Importar Productos desde Excel
-          </h2>
+        <input
+          type="file"
+          accept=".xlsx, .xls, .csv"
+          onChange={handleFile}
+          className="border border-green-600 bg-[#1a1f25] p-2 rounded w-full mb-4"
+        />
 
+        {preview.length > 0 && (
+          <div className="max-h-40 overflow-auto text-sm bg-black/20 p-2 rounded border border-green-800">
+            {preview.slice(0, 5).map((row, i) => (
+              <pre key={i}>{JSON.stringify(row, null, 2)}</pre>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end mt-4 gap-3">
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-red-400 font-bold text-lg"
+            className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600"
           >
-            ✕
+            Cancelar
           </button>
-        </div>
 
-        {/* INPUT */}
-        <div className="p-4 flex flex-col gap-3">
-          <label className="text-green-400 font-semibold">
-            Archivo Excel (.xlsx):
-          </label>
-
-          <input
-            type="file"
-            accept=".xlsx, .xls"
-            onChange={handleFile}
-            className="w-full text-sm text-green-200"
-          />
-        </div>
-
-        {/* PREVIEW */}
-        <div className="px-4 pb-4">
-          {preview.length > 0 && (
-            <div className="border border-green-800 rounded-lg mt-2">
-
-              {/* CABECERA FIJA */}
-              <div className="grid grid-cols-4 bg-green-900/40 text-green-200 font-bold text-sm p-2 sticky top-0 border-b border-green-800">
-                <div>Nombre</div>
-                <div>Unidad</div>
-                <div>Stock</div>
-                <div>Stock Mín.</div>
-              </div>
-
-              {/* SCROLLABLE BODY */}
-              <div className="max-h-[380px] overflow-y-auto">
-                {preview.map((row, idx) => (
-                  <div
-                    key={idx}
-                    className="grid grid-cols-4 text-sm p-2 border-b border-green-800/20 hover:bg-green-900/20"
-                  >
-                    <div>{row.nombre}</div>
-                    <div>{row.unidad}</div>
-                    <div>{row.stock}</div>
-                    <div>{row.stockMinimo}</div>
-                  </div>
-                ))}
-              </div>
-
-            </div>
-          )}
-        </div>
-
-        {/* FOOTER */}
-        <div className="p-4 border-t border-green-900/40 flex justify-end">
           <button
             onClick={importar}
-            className="bg-green-700 hover:bg-green-800 px-4 py-2 rounded-lg font-semibold text-white shadow-md"
+            className="px-4 py-2 bg-green-600 rounded hover:bg-green-700"
           >
             Importar
           </button>
