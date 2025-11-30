@@ -23,7 +23,7 @@ export default function EntradasPage() {
   };
 
   // ============================
-  // CARGAR PRODUCTOS — IMPORTANTE
+  // CARGAR PRODUCTOS
   // ============================
   const cargarProductos = async () => {
     try {
@@ -37,7 +37,7 @@ export default function EntradasPage() {
 
   useEffect(() => {
     cargarEntradas();
-    cargarProductos(); // ✔ NECESARIO
+    cargarProductos(); 
   }, []);
 
   return (
@@ -56,9 +56,9 @@ export default function EntradasPage() {
           setOpenModal(false);
           setEditData(null);
         }}
-        refresh={cargarEntradas}
+        onSuccess={cargarEntradas}   // ← ✔ CORREGIDO
         editData={editData}
-        productos={productos}   // ✔ SE PASAN LOS PRODUCTOS
+        productos={productos}
       />
     </div>
   );
