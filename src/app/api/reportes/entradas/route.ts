@@ -8,16 +8,19 @@ import { rgb } from "pdf-lib";
 export async function GET() {
   try {
     const entradas = await prisma.entrada.findMany({
+      orderBy: { fecha: "desc" },
       include: {
         producto: true,
       },
-      orderBy: { fecha: "desc" },
     });
 
+    // Base PDF
     const { pdfDoc, page, width, height, font } = await crearPDFBase();
+    let currentPage = page;
     let y = height - 120;
 
-    page.drawText("REPORTE DE ENTRADAS", {
+    // TÍTULO
+    currentPage.drawText("REPORTE DE ENTRADAS", {
       x: 20,
       y,
       size: 18,
@@ -27,13 +30,15 @@ export async function GET() {
 
     y -= 35;
 
-    page.drawText("Fecha", { x: 20, y, size: 12, font });
-    page.drawText("Producto", { x: 140, y, size: 12, font });
-    page.drawText("Cantidad", { x: 350, y, size: 12, font });
+    // ENCABEZADOS
+    currentPage.drawText("Fecha", { x: 20, y, size: 12, font });
+    currentPage.drawText("Producto", { x: 140, y, size: 12, font });
+    currentPage.drawText("Cantidad", { x: 350, y, size: 12, font });
 
     y -= 15;
 
-    page.drawLine({
+    // Línea
+    currentPage.drawLine({
       start: { x: 20, y },
       end: { x: width - 20, y },
       thickness: 1,
@@ -42,22 +47,35 @@ export async function GET() {
 
     y -= 20;
 
-    entradas.forEach((e) => {
-      page.drawText(e.fecha.toISOString().slice(0, 10), {
+    // CONTENIDO
+    for (const e of entradas) {
+      // Crear nueva página cuando no cabe más contenido
+      if (y < 80) {
+        currentPage = pdfDoc.addPage([595.28, 841.89]);
+        y = 800;
+
+        currentPage.drawText("Fecha", { x: 20, y, size: 12, font });
+        currentPage.drawText("Producto", { x: 140, y, size: 12, font });
+        currentPage.drawText("Cantidad", { x: 350, y, size: 12, font });
+
+        y -= 20;
+      }
+
+      currentPage.drawText(e.fecha.toISOString().slice(0, 10), {
         x: 20,
         y,
         size: 12,
         font,
       });
 
-      page.drawText(e.producto.nombre, {
+      currentPage.drawText(e.producto.nombre, {
         x: 140,
         y,
         size: 12,
         font,
       });
 
-      page.drawText(`${e.cantidad}`, {
+      currentPage.drawText(`${e.cantidad}`, {
         x: 350,
         y,
         size: 12,
@@ -65,24 +83,21 @@ export async function GET() {
       });
 
       y -= 18;
+    }
 
-      if (y < 80) {
-        const newPage = pdfDoc.addPage([595.28, 841.89]);
-        y = 800;
-      }
-    });
-
+    // GENERAR PDF
     const pdfBytes = await pdfDoc.save();
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": "attachment; filename=entradas.pdf",
       },
     });
+
   } catch (error) {
     console.error("ERROR PDF ENTRADAS:", error);
-    return NextResponse.json({ msg: "Error" }, { status: 500 });
+    return NextResponse.json({ msg: "Error generando PDF" }, { status: 500 });
   }
 }
