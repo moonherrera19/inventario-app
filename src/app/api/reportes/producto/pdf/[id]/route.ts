@@ -7,19 +7,20 @@ import { prisma } from "@/lib/prisma";
 import PDFDocument from "pdfkit";
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = Number(params.id);
+    const { id } = await context.params;
 
-    if (!id) {
+    const numericId = Number(id);
+
+    if (!numericId) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
-    // Obtener producto
     const producto = await prisma.producto.findUnique({
-      where: { id },
+      where: { id: numericId },
       include: {
         categoria: true,
         proveedor: true,
@@ -33,22 +34,23 @@ export async function GET(
       );
     }
 
-    // PDF
     const doc = new PDFDocument({ margin: 40 });
     const chunks: Buffer[] = [];
 
     doc.on("data", (c) => chunks.push(c));
     doc.on("end", () => {});
 
-    // Titulo
-    doc.fontSize(22)
+    doc
+      .fontSize(22)
       .fillColor("#0DE67B")
       .text("Ficha del Producto", { align: "center" });
 
     doc.moveDown();
 
-    // Información del producto
-    doc.fontSize(12).fillColor("#FFFFFF").text(`  
+    doc
+      .fontSize(12)
+      .fillColor("#FFFFFF")
+      .text(`
 ID: ${producto.id}
 Nombre: ${producto.nombre}
 Categoría: ${producto.categoria?.nombre || "-"}
@@ -69,10 +71,9 @@ Precio unitario: ${producto.precioUnitario ?? "N/D"}
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename=producto_${id}.pdf`,
+        "Content-Disposition": `attachment; filename=producto_${numericId}.pdf`,
       },
     });
-
   } catch (error) {
     console.error("❌ Error PDF producto:", error);
     return NextResponse.json(
