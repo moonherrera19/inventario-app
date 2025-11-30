@@ -23,15 +23,17 @@ export async function GET() {
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    let y = height - 50; // posicion inicial
+    let y = height - 50;
 
+    // ---------------------------
     // TÍTULO
+    // ---------------------------
     page.drawText("Reporte de Consumos", {
       x: 50,
       y,
       size: 22,
       font: fontBold,
-      color: rgb(0.05, 0.9, 0.48), // verde
+      color: rgb(0.05, 0.9, 0.48),
     });
 
     y -= 30;
@@ -49,10 +51,12 @@ export async function GET() {
 
     let total = 0;
 
-    // RECORRER CONSUMOS
+    // ---------------------------
+    // LISTADO DE CONSUMOS
+    // ---------------------------
     for (const c of consumos) {
+      // Crear nueva página cuando se llene
       if (y < 80) {
-        // Crear nueva página automática
         const newPage = pdfDoc.addPage();
         y = newPage.getHeight() - 50;
       }
@@ -93,8 +97,7 @@ export async function GET() {
       });
       y -= 20;
 
-      // separador
-      page.drawText("-------------------------------------------", {
+      page.drawText("----------------------------------------------", {
         x: 50,
         y,
         size: 12,
@@ -103,14 +106,13 @@ export async function GET() {
       });
 
       y -= 25;
-
       total += c.cantidad;
     }
 
-    // TOTAL
+    // TOTAL FINAL
     if (y < 60) {
-      pdfDoc.addPage();
-      y = height - 50;
+      const newPage = pdfDoc.addPage();
+      y = newPage.getHeight() - 50;
     }
 
     page.drawText(`Total consumido: ${total}`, {
@@ -121,16 +123,19 @@ export async function GET() {
       color: rgb(0.05, 0.9, 0.48),
     });
 
-    // Exportar PDF
+    // ---------------------------
+    // GENERAR PDF
+    // ---------------------------
     const pdfBytes = await pdfDoc.save();
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": "attachment; filename=consumos.pdf",
       },
     });
+
   } catch (e) {
     console.error(e);
     return NextResponse.json(
