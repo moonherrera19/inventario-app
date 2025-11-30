@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { Buffer } from "buffer"; // 👈 IMPORTANTE
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,11 +16,13 @@ export async function GET(req: NextRequest) {
     let page = pdfDoc.addPage();
     const width = page.getWidth();
     const height = page.getHeight();
+
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     let y = height - 50;
 
+    // TÍTULO
     page.drawText("Reporte de Salidas", {
       x: 40,
       y,
@@ -30,6 +33,7 @@ export async function GET(req: NextRequest) {
 
     y -= 40;
 
+    // SI NO HAY SALIDAS
     if (salidas.length === 0) {
       page.drawText("No hay salidas registradas.", {
         x: 40,
@@ -50,6 +54,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // RECORRER CADA SALIDA
     for (const s of salidas) {
       if (y < 100) {
         page = pdfDoc.addPage();
@@ -93,6 +98,7 @@ export async function GET(req: NextRequest) {
       y -= 30;
     }
 
+    // GENERAR PDF FINAL
     const pdfBytes = await pdfDoc.save();
 
     return new NextResponse(Buffer.from(pdfBytes), {
