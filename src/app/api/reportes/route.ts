@@ -7,9 +7,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 export async function GET(req: NextRequest) {
   try {
     const salidas = await prisma.salida.findMany({
-      include: {
-        producto: true,
-      },
+      include: { producto: true },
       orderBy: { fecha: "desc" },
     });
 
