@@ -8,9 +8,15 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// -------------------------------------------------
+// TIPOS CORREGIDOS
+// -------------------------------------------------
 interface CategoriaItem {
   nombre: string;
   total: number;
+
+  // 👇 Requisito de Recharts para evitar errores TS
+  [key: string]: any;
 }
 
 interface Props {
@@ -30,11 +36,10 @@ export default function CategoriasDonut({ data }: Props) {
         <ResponsiveContainer>
           <PieChart>
             <Pie
-              data={data}
+              data={data}        // ← YA NO FALLA
               dataKey="total"
               nameKey="nombre"
               outerRadius={80}
-              fill="#4caf50"
             >
               {data?.map((entry, index) => (
                 <Cell key={index} fill={COLORS[index % COLORS.length]} />
