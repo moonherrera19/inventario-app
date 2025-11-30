@@ -1,110 +1,114 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const tipo = searchParams.get("tipo") || "diario";
+    const salidas = await prisma.salida.findMany({
+      include: {
+        producto: true,
+      },
+      orderBy: { fecha: "desc" },
+    });
 
-    // Fechas base
-    const hoy = new Date();
-    const inicioDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const pdfDoc = await PDFDocument.create();
+    let page = pdfDoc.addPage();
+    const width = page.getWidth();
+    const height = page.getHeight();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    const inicioSemana = new Date(inicioDia);
-    inicioSemana.setDate(inicioDia.getDate() - 7);
+    let y = height - 50;
 
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    page.drawText("Reporte de Salidas", {
+      x: 40,
+      y,
+      size: 22,
+      font: bold,
+      color: rgb(0.2, 0.8, 0.2),
+    });
 
-    let desde;
+    y -= 40;
 
-    switch (tipo) {
-      case "diario":
-        desde = inicioDia;
-        break;
-      case "semanal":
-        desde = inicioSemana;
-        break;
-      case "mensual":
-        desde = inicioMes;
-        break;
-      default:
-        return NextResponse.json(
-          { message: "Tipo de reporte inválido" },
-          { status: 400 }
-        );
+    if (salidas.length === 0) {
+      page.drawText("No hay salidas registradas.", {
+        x: 40,
+        y,
+        size: 14,
+        font,
+        color: rgb(0.7, 0.7, 0.7),
+      });
+
+      const pdfBytesEmpty = await pdfDoc.save();
+
+      return new NextResponse(Buffer.from(pdfBytesEmpty), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": "attachment; filename=salidas.pdf",
+        },
+      });
     }
 
-    // ================================================
-    // ENTRADAS
-    // ================================================
-    const entradas = await prisma.entrada.findMany({
-      where: { fecha: { gte: desde } },
-      include: { producto: true },
-      orderBy: { fecha: "desc" },
-    });
+    for (const s of salidas) {
+      if (y < 100) {
+        page = pdfDoc.addPage();
+        y = page.getHeight() - 50;
+      }
 
-    // Total Kg/L/pz recibidas
-    const totalEntradas = entradas.reduce((sum, e) => sum + e.cantidad, 0);
+      page.drawText(`Producto: ${s.producto?.nombre ?? "-"}`, {
+        x: 40,
+        y,
+        size: 14,
+        font: bold,
+      });
 
-    // ================================================
-    // SALIDAS
-    // ================================================
-    const salidas = await prisma.salida.findMany({
-      where: { fecha: { gte: desde } },
-      include: { producto: true },
-      orderBy: { fecha: "desc" },
-    });
+      y -= 18;
 
-    const totalSalidas = salidas.reduce((sum, s) => sum + s.cantidad, 0);
+      page.drawText(`Cantidad: ${s.cantidad}`, {
+        x: 40,
+        y,
+        size: 12,
+        font,
+      });
 
-    // ================================================
-    // COMPRAS
-    // ================================================
-    const compras = await prisma.compra.findMany({
-      where: { fecha: { gte: desde } },
-      include: { producto: true, proveedor: true },
-      orderBy: { fecha: "desc" },
-    });
+      y -= 15;
 
-    const totalGasto = compras.reduce((sum, c) => sum + c.costo * c.cantidad, 0);
+      page.drawText(`Fecha: ${new Date(s.fecha).toLocaleString()}`, {
+        x: 40,
+        y,
+        size: 12,
+        font,
+      });
 
-    // ================================================
-    // CONSUMOS POR LOTE
-    // ================================================
-    const consumos = await prisma.consumo.findMany({
-      where: { fecha: { gte: desde } },
-      include: { producto: true, lote: true },
-      orderBy: { fecha: "desc" },
-    });
+      y -= 20;
 
-    const totalConsumos = consumos.reduce((sum, c) => sum + c.cantidad, 0);
+      page.drawLine({
+        start: { x: 40, y },
+        end: { x: width - 40, y },
+        thickness: 1,
+        color: rgb(0.5, 0.5, 0.5),
+      });
 
-    // ================================================
-    // RESPUESTA FINAL (PROFESIONAL)
-    // ================================================
-    return NextResponse.json({
-      tipo,
-      desde,
-      hasta: hoy,
+      y -= 30;
+    }
 
-      resumen: {
-        totalEntradas,
-        totalSalidas,
-        totalGasto,
-        totalConsumos,
-      },
+    const pdfBytes = await pdfDoc.save();
 
-      detalle: {
-        entradas,
-        salidas,
-        compras,
-        consumos,
+    return new NextResponse(Buffer.from(pdfBytes), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": "attachment; filename=salidas.pdf",
       },
     });
+
   } catch (error) {
-    console.error("❌ Error en Reportes:", error);
+    console.error("❌ Error PDF salidas:", error);
     return NextResponse.json(
-      { message: "Error generando reporte" },
+      { error: "Error generando PDF" },
       { status: 500 }
     );
   }
