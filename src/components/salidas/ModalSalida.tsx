@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-export default function ModalSalida({ open, onClose, productos }) {
+export default function ModalSalida({ open, onClose, onSuccess, productos }) {
   const [productoId, setProductoId] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [error, setError] = useState("");
@@ -16,7 +16,7 @@ export default function ModalSalida({ open, onClose, productos }) {
     setSuccess("");
   };
 
-  // Stock disponible: corregido (string → number)
+  // Stock disponible del producto seleccionado
   const stockDisponible = productoId
     ? productos.find((p) => p.id === Number(productoId))?.stock || 0
     : 0;
@@ -41,7 +41,7 @@ export default function ModalSalida({ open, onClose, productos }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            productoId: Number(productoId), // ✔ CORREGIDO
+            productoId: Number(productoId),
             cantidad: cantidadNum,
           }),
         });
@@ -54,6 +54,9 @@ export default function ModalSalida({ open, onClose, productos }) {
 
         setSuccess("Salida registrada correctamente.");
         resetForm();
+
+        // 🔥 dispara recarga del listado si te pasan la función
+        if (onSuccess) onSuccess();
 
         setTimeout(() => {
           onClose();
@@ -70,7 +73,6 @@ export default function ModalSalida({ open, onClose, productos }) {
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]">
       <div className="bg-[#0f1a13] border border-green-800 w-full max-w-md p-6 rounded-xl shadow-xl">
 
-        {/* TÍTULO */}
         <h2 className="text-2xl font-bold text-green-300 mb-4 text-center">
           Registrar Salida
         </h2>

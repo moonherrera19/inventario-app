@@ -7,7 +7,6 @@ export default function SalidasPage() {
   const [salidas, setSalidas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [openModal, setOpenModal] = useState(false);
-  const [editData, setEditData] = useState(null);
 
   // ============================
   // CARGAR SALIDAS
@@ -23,7 +22,7 @@ export default function SalidasPage() {
   };
 
   // ============================
-  // CARGAR PRODUCTOS — IMPORTANTE
+  // CARGAR PRODUCTOS
   // ============================
   const cargarProductos = async () => {
     try {
@@ -37,7 +36,7 @@ export default function SalidasPage() {
 
   useEffect(() => {
     cargarSalidas();
-    cargarProductos(); // ✔ SIN ESTO EL SELECT VIENE VACÍO
+    cargarProductos(); // ✔ IMPORTANTE
   }, []);
 
   return (
@@ -52,13 +51,9 @@ export default function SalidasPage() {
 
       <ModalSalida
         open={openModal}
-        onClose={() => {
-          setOpenModal(false);
-          setEditData(null);
-        }}
-        refresh={cargarSalidas}
-        editData={editData}
-        productos={productos}  // ✔ ENVÍA LOS PRODUCTOS
+        onClose={() => setOpenModal(false)}
+        onSuccess={cargarSalidas}   // ✔ CORRECTO
+        productos={productos}       // ✔ PRODUCTOS PARA EL SELECT
       />
     </div>
   );
