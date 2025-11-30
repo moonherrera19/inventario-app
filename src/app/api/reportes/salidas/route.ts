@@ -1,78 +1,68 @@
 export const runtime = "nodejs";
 
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { crearPDFBase } from "@/lib/pdf/basePDF";
-import { rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { Buffer } from "buffer";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const salidas = await prisma.salida.findMany({
       include: { producto: true },
       orderBy: { fecha: "desc" },
     });
 
-    const { pdfDoc, page, width, height, font } = await crearPDFBase();
-    let y = height - 120;
+    const pdfDoc = await PDFDocument.create();
+    let page = pdfDoc.addPage();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    page.drawText("REPORTE DE SALIDAS", {
-      x: 20,
+    let y = page.getHeight() - 50;
+
+    page.drawText("Reporte de Salidas", {
+      x: 40,
       y,
-      size: 18,
-      font,
-      color: rgb(0.7, 0.2, 0.2),
+      size: 22,
+      font: bold,
+      color: rgb(0.2, 0.8, 0.2),
     });
 
-    y -= 35;
+    y -= 40;
 
-    page.drawText("Fecha", { x: 20, y, size: 12, font });
-    page.drawText("Producto", { x: 140, y, size: 12, font });
-    page.drawText("Cantidad", { x: 350, y, size: 12, font });
-
-    y -= 15;
-
-    page.drawLine({
-      start: { x: 20, y },
-      end: { x: width - 20, y },
-      thickness: 1,
-      color: rgb(0.6, 0.2, 0.2),
-    });
-
-    y -= 20;
-
-    salidas.forEach((e) => {
-      page.drawText(e.fecha.toISOString().slice(0, 10), {
-        x: 20,
-        y,
-        size: 12,
-        font,
-      });
-
-      page.drawText(e.producto.nombre, {
-        x: 140,
-        y,
-        size: 12,
-        font,
-      });
-
-      page.drawText(`${e.cantidad}`, {
-        x: 350,
-        y,
-        size: 12,
-        font,
-      });
-
-      y -= 18;
-
+    for (const s of salidas) {
       if (y < 80) {
-        const newPage = pdfDoc.addPage([595.28, 841.89]);
-        y = 800;
+        page = pdfDoc.addPage();
+        y = page.getHeight() - 50;
       }
-    });
+
+      page.drawText(`Producto: ${s.producto?.nombre ?? "-"}`, {
+        x: 40,
+        y,
+        size: 14,
+        font: bold,
+      });
+      y -= 16;
+
+      page.drawText(`Cantidad: ${s.cantidad}`, {
+        x: 40,
+        y,
+        size: 12,
+        font,
+      });
+      y -= 14;
+
+      page.drawText(`Fecha: ${new Date(s.fecha).toLocaleString()}`, {
+        x: 40,
+        y,
+        size: 12,
+        font,
+      });
+      y -= 28;
+    }
 
     const pdfBytes = await pdfDoc.save();
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
@@ -80,7 +70,10 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("ERROR PDF SALIDAS:", error);
-    return NextResponse.json({ msg: "Error" }, { status: 500 });
+    console.error("❌ Error PDF salidas:", error);
+    return NextResponse.json(
+      { error: "Error generando PDF" },
+      { status: 500 }
+    );
   }
 }
