@@ -18,14 +18,18 @@ export default function ModalCategoria({ close, refresh, editData }: any) {
     }
 
     startTransition(async () => {
-      const data = { nombre, descripcion };
+      // 👇 Declarar como ANY para evitar el error TS
+      let data: any = {
+        nombre,
+        descripcion,
+      };
 
       let url = "/api/categorias";
       let method = "POST";
 
       if (editData) {
         method = "PUT";
-        data["id"] = editData.id;
+        data.id = editData.id; // ✔ TS ya no protesta
       }
 
       const res = await fetch(url, {
@@ -35,8 +39,8 @@ export default function ModalCategoria({ close, refresh, editData }: any) {
       });
 
       if (res.ok) {
-        refresh();
-        close();
+        refresh(); // refrescar tabla
+        close(); // cerrar modal
       } else {
         alert("Ocurrió un error.");
       }
