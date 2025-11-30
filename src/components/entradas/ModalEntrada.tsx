@@ -1,44 +1,50 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+
+// Tipado de props
+interface ModalEntradaProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  editData?: {
+    id: number;
+    productoId: number;
+    cantidad: number;
+    fecha: string;
+  } | null;
+  productos: {
+    id: number;
+    nombre: string;
+    unidad: string;
+  }[];
+}
 
 export default function ModalEntrada({
   open,
   onClose,
-  onSuccess,   // 👉 YA ACEPTA onSuccess
+  onSuccess,
   editData,
-  productos = [],
-}) {
-  const [productoId, setProductoId] = useState("");
-  const [cantidad, setCantidad] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  productos,
+}: ModalEntradaProps) {
 
+  const [productoId, setProductoId] = useState(editData?.productoId || "");
+  const [cantidad, setCantidad] = useState(editData?.cantidad || "");
   const [isPending, startTransition] = useTransition();
-
-  // Si viene editData, rellenamos
-  useEffect(() => {
-    if (editData) {
-      setProductoId(editData.productoId.toString());
-      setCantidad(editData.cantidad.toString());
-    }
-  }, [editData]);
+  const [error, setError] = useState("");
 
   const resetForm = () => {
     setProductoId("");
     setCantidad("");
     setError("");
-    setSuccess("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setError("");
-    setSuccess("");
 
-    const cantidadNum = Number(cantidad);
-    if (!productoId) return setError("Debes seleccionar un producto.");
-    if (!cantidadNum || cantidadNum <= 0)
+    if (!productoId) return setError("Selecciona un producto.");
+    if (!cantidad || Number(cantidad) <= 0)
       return setError("La cantidad debe ser mayor a 0.");
 
     startTransition(async () => {
@@ -49,22 +55,22 @@ export default function ModalEntrada({
           body: JSON.stringify({
             id: editData?.id,
             productoId: Number(productoId),
-            cantidad: cantidadNum,
+            cantidad: Number(cantidad),
           }),
         });
 
         const data = await res.json();
-        if (!res.ok) return setError(data.message || "Error al guardar.");
 
-        setSuccess("Entrada registrada correctamente.");
+        if (!res.ok) {
+          setError(data.message || "Error al guardar la entrada.");
+          return;
+        }
+
+        onSuccess();
         resetForm();
-
-        setTimeout(() => {
-          onSuccess(); // 👉 YA NOTIFICA A LA PÁGINA
-          onClose();
-        }, 900);
-      } catch (error) {
-        setError("Error inesperado.");
+        onClose();
+      } catch (err) {
+        setError("Error inesperado, intenta de nuevo.");
       }
     });
   };
@@ -72,10 +78,10 @@ export default function ModalEntrada({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-4 z-[9999]">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]">
       <div className="bg-[#0f1a13] border border-green-800 w-full max-w-md p-6 rounded-xl shadow-xl">
 
-        <h2 className="text-2xl font-bold text-green-300 text-center mb-4">
+        <h2 className="text-2xl font-bold text-green-300 mb-4 text-center">
           {editData ? "Editar Entrada" : "Registrar Entrada"}
         </h2>
 
@@ -83,7 +89,7 @@ export default function ModalEntrada({
 
           {/* PRODUCTO */}
           <div>
-            <label className="text-sm text-green-200 mb-1 block">
+            <label className="block text-sm text-green-200 mb-1">
               Producto
             </label>
             <select
@@ -92,7 +98,8 @@ export default function ModalEntrada({
               className="w-full rounded-lg p-2 bg-[#142017] border border-green-700 text-white"
             >
               <option value="">Selecciona un producto</option>
-              {productos.map((p) => (
+
+              {productos?.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.nombre}
                 </option>
@@ -102,36 +109,34 @@ export default function ModalEntrada({
 
           {/* CANTIDAD */}
           <div>
-            <label className="text-sm text-green-200 mb-1 block">
-              Cantidad
+            <label className="block text-sm text-green-200 mb-1">
+              Cantidad a ingresar
             </label>
             <input
               type="number"
-              min={0.01}
-              step={0.01}
+              min={1}
               value={cantidad}
               onChange={(e) => setCantidad(e.target.value)}
-              className="w-full p-2 rounded-lg bg-[#142017] border border-green-700 text-white"
+              className="w-full rounded-lg p-2 bg-[#142017] border border-green-700 text-white"
             />
           </div>
 
-          {/* ERRORES */}
+          {/* ERROR */}
           {error && (
-            <p className="text-red-400 text-center">{error}</p>
-          )}
-          {success && (
-            <p className="text-green-400 text-center">{success}</p>
+            <p className="text-red-400 text-center text-sm font-medium">
+              {error}
+            </p>
           )}
 
           {/* BOTONES */}
-          <div className="flex justify-between pt-4">
+          <div className="flex justify-between mt-6">
             <button
               type="button"
               onClick={() => {
                 resetForm();
                 onClose();
               }}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white"
             >
               Cancelar
             </button>
@@ -145,7 +150,7 @@ export default function ModalEntrada({
                   : "bg-green-600 hover:bg-green-700"
               }`}
             >
-              {isPending ? "Guardando..." : "Guardar Entrada"}
+              {isPending ? "Guardando..." : editData ? "Guardar" : "Registrar"}
             </button>
           </div>
 
