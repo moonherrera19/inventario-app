@@ -14,9 +14,6 @@ export async function GET(req: Request) {
     if (tipo === "semanal") desde.setDate(hoy.getDate() - 7);
     if (tipo === "mensual") desde.setMonth(hoy.getMonth() - 1);
 
-    // ============================================================
-    // CONSULTAR BD
-    // ============================================================
     const entradas = await prisma.entrada.findMany({
       where: { fecha: { gte: desde } },
       include: { producto: true },
@@ -37,18 +34,20 @@ export async function GET(req: Request) {
       include: { producto: true, lote: true },
     });
 
-    // ============================================================
-    // CONFIGURAR PDF
-    // ============================================================
+    // ============================
+    // PDF + BUFFER
+    // ============================
     const doc = new PDFDocument({ size: "A4", margin: 40 });
     const chunks: Buffer[] = [];
+    const safe = (val: any) =>
+      val === null || val === undefined ? "" : String(val);
 
-    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => {});
 
-    // ============================================================
+    // ============================
     // ENCABEZADO
-    // ============================================================
+    // ============================
     doc
       .fontSize(22)
       .fillColor("#22c55e")
@@ -60,8 +59,7 @@ export async function GET(req: Request) {
       .fillColor("#ddd")
       .text(`Periodo: ${tipo.toUpperCase()}`, { align: "center" });
 
-    doc.moveDown(1);
-
+    doc.moveDown();
     doc
       .moveTo(40, doc.y)
       .lineTo(550, doc.y)
@@ -70,11 +68,9 @@ export async function GET(req: Request) {
 
     doc.moveDown(2);
 
-    // ============================================================
-    // FUNCIÓN PARA TABLAS ESTABLES (NO FALLA EN VERCEL)
-    // ============================================================
-    const safe = (val: any) => (val === null || val === undefined ? "" : String(val));
-
+    // ============================
+    // TABLA SEGURA
+    // ============================
     const drawTable = (title: string, headers: string[], rows: any[]) => {
       if (!rows || rows.length === 0) return;
 
@@ -83,25 +79,24 @@ export async function GET(req: Request) {
 
       doc.fontSize(11).fillColor("#22c55e");
 
-      let colWidth = (550 - 40) / headers.length;
+      const colWidth = (550 - 40) / headers.length;
 
-      // Encabezados
       headers.forEach((h, i) => {
         doc.text(h, 40 + i * colWidth, doc.y, { width: colWidth });
       });
-      doc.moveDown(1);
 
+      doc.moveDown(1);
       doc.fillColor("#fff");
 
       rows.forEach((row) => {
         headers.forEach((h, i) => {
-          let val = safe(row[h]);
-          doc.text(val, 40 + i * colWidth, doc.y, { width: colWidth });
+          doc.text(safe(row[h]), 40 + i * colWidth, doc.y, {
+            width: colWidth,
+          });
         });
 
         doc.moveDown(0.7);
 
-        // SALTO DE PÁGINA AUTOMÁTICO
         if (doc.y > 750) {
           doc.addPage();
           doc.moveDown();
@@ -111,9 +106,9 @@ export async function GET(req: Request) {
       doc.moveDown(2);
     };
 
-    // ============================================================
+    // ============================
     // SECCIONES
-    // ============================================================
+    // ============================
     drawTable(
       "Entradas",
       ["producto", "cantidad", "fecha"],
@@ -154,9 +149,9 @@ export async function GET(req: Request) {
       }))
     );
 
-    // ============================================================
-    // FINALIZAR PDF
-    // ============================================================
+    // ============================
+    // FINALIZAR
+    // ============================
     doc.end();
     await new Promise((resolve) => doc.on("end", resolve));
 
