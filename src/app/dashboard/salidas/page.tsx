@@ -3,8 +3,21 @@
 import { useState, useEffect } from "react";
 import ModalSalida from "@/components/salidas/ModalSalida";
 
+// ==============================
+// TIPADO DE LA DATA (Evita error: never.id)
+// ==============================
+interface SalidaType {
+  id: number;
+  fecha: string;
+  cantidad: number;
+  producto: {
+    nombre: string;
+    unidad: string;
+  };
+}
+
 export default function SalidasPage() {
-  const [salidas, setSalidas] = useState([]);
+  const [salidas, setSalidas] = useState<SalidaType[]>([]);
   const [productos, setProductos] = useState([]);
   const [openModal, setOpenModal] = useState(false);
 
@@ -36,7 +49,7 @@ export default function SalidasPage() {
 
   useEffect(() => {
     cargarSalidas();
-    cargarProductos(); 
+    cargarProductos();
   }, []);
 
   return (
