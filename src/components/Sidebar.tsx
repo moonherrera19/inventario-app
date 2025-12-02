@@ -4,79 +4,60 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export default function Sidebar() {
-  const pathname = usePathname();
+  const path = usePathname();
 
-  const linkClass = (path: string) =>
-    `block px-4 py-2 rounded-lg font-medium transition ${
-      pathname.startsWith(path)
-        ? "text-green-400 bg-green-900/20"
-        : "text-gray-300 hover:text-white hover:bg-green-900/10"
+  const linkClass = (route) =>
+    `block px-4 py-2 rounded-lg mb-1 transition ${
+      path === route
+        ? "bg-green-700 text-white"
+        : "text-gray-300 hover:bg-gray-800 hover:text-white"
     }`;
 
   return (
-    <div className="w-64 min-h-screen bg-[#0c1117] border-r border-green-800/30 p-6">
-      <h2 className="text-3xl font-bold text-green-400 mb-8">Inventario</h2>
+    <aside className="w-60 bg-[#0c0e11] h-screen p-4 border-r border-gray-800">
+      <h2 className="text-xl font-bold mb-6 text-green-400">
+        Inventario
+      </h2>
 
-      <nav className="flex flex-col gap-3">
+      <nav className="flex flex-col space-y-1">
 
         <Link href="/dashboard" className={linkClass("/dashboard")}>
           Dashboard
         </Link>
 
-        <Link href="/dashboard/productos" className={linkClass("/dashboard/productos")}>
+        <Link href="/productos" className={linkClass("/productos")}>
           Productos
         </Link>
 
-        <Link href="/dashboard/categorias" className={linkClass("/dashboard/categorias")}>
+        <Link href="/categorias" className={linkClass("/categorias")}>
           Categorías
         </Link>
 
-        <Link href="/dashboard/proveedores" className={linkClass("/dashboard/proveedores")}>
+        <Link href="/proveedores" className={linkClass("/proveedores")}>
           Proveedores
         </Link>
 
-        <Link href="/dashboard/entradas" className={linkClass("/dashboard/entradas")}>
+        <Link href="/entradas" className={linkClass("/entradas")}>
           Entradas
         </Link>
 
-        <Link href="/dashboard/salidas" className={linkClass("/dashboard/salidas")}>
+        <Link href="/salidas" className={linkClass("/salidas")}>
           Salidas
         </Link>
 
-        <Link href="/dashboard/compras" className={linkClass("/dashboard/compras")}>
+        <Link href="/compras" className={linkClass("/compras")}>
           Compras
         </Link>
 
-        <Link href="/dashboard/recetas" className={linkClass("/dashboard/recetas")}>
+        <Link href="/recetas" className={linkClass("/recetas")}>
           Recetas
         </Link>
 
-        <Link href="/dashboard/consumos" className={linkClass("/dashboard/consumos")}>
-          Consumos por lote
-        </Link>
-
-        <Link href="/dashboard/lotes" className={linkClass("/dashboard/lotes")}>
-          Lotes agrícolas
-        </Link>
-
-        <Link href="/dashboard/reportes" className={linkClass("/dashboard/reportes")}>
+        <Link href="/reportes" className={linkClass("/reportes")}>
           Reportes
         </Link>
 
-        <div className="mt-6 border-t border-green-900/40 pt-4">
-          <Link href="/dashboard/configuracion" className={linkClass("/dashboard/configuracion")}>
-            Configuración
-          </Link>
-
-          <Link href="/dashboard/usuarios" className={linkClass("/dashboard/usuarios")}>
-            Usuarios
-          </Link>
-
-          <Link href="/dashboard/roles" className={linkClass("/dashboard/roles")}>
-            Roles
-          </Link>
-        </div>
       </nav>
-    </div>
+    </aside>
   );
 }
