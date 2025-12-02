@@ -14,14 +14,17 @@ export async function GET() {
     });
 
     // ============================
-    // CREAR PDF + BUFFER (obligatorio en Vercel)
+    // CREAR PDF + BUFFER
     // ============================
     const doc = new PDFDocument({ size: "A4", margin: 40 });
     const chunks: Buffer[] = [];
+
     const safe = (v: any) =>
       v === undefined || v === null ? "" : String(v);
 
-    doc.on("data", (chunk) => chunks.push(chunk));
+    // ******* FIX IMPORTANTE *******
+
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => {});
 
     // ============================
@@ -48,7 +51,7 @@ export async function GET() {
     doc.moveDown(2);
 
     // ============================
-    // LISTA DE RECETAS
+    // RECETAS
     // ============================
     recetas.forEach((receta) => {
       doc
@@ -77,10 +80,11 @@ export async function GET() {
           .fontSize(11)
           .fillColor("#FFFFFF")
           .text(
-            `• ${safe(ing.producto?.nombre)} — ${cantidad} ${safe(ing.producto?.unidad)} (Costo: $${subtotal.toFixed(2)})`
+            `• ${safe(ing.producto?.nombre)} — ${cantidad} ${safe(
+              ing.producto?.unidad
+            )} (Costo: $${subtotal.toFixed(2)})`
           );
 
-        // Salto de página seguro
         if (doc.y > 750) {
           doc.addPage();
           doc.moveDown();
@@ -95,10 +99,7 @@ export async function GET() {
 
       doc.moveDown(1.5);
 
-      doc
-        .fillColor("#444")
-        .text("-----------------------------------------------");
-
+      doc.fillColor("#444").text("-----------------------------------------------");
       doc.moveDown(1);
 
       if (doc.y > 750) {
