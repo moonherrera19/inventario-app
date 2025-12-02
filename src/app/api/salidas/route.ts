@@ -1,37 +1,44 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
-const prisma = new PrismaClient();
-
-// =====================================================
-// GET → Listar salidas
-// =====================================================
+// ===========================================
+// GET — OBTENER TODAS LAS SALIDAS
+// ===========================================
 export async function GET() {
-  const salidas = await prisma.salida.findMany({
-    orderBy: { id: "desc" },
-    include: {
-      producto: true,
-    },
-  });
+  try {
+    const salidas = await prisma.salida.findMany({
+      orderBy: { fecha: "desc" },
+      include: {
+        producto: true,
+      },
+    });
 
-  return NextResponse.json(salidas);
+    return NextResponse.json(salidas);
+  } catch (error) {
+    console.error("❌ Error GET salidas:", error);
+    return NextResponse.json(
+      { error: "Error al obtener salidas" },
+      { status: 500 }
+    );
+  }
 }
 
-// =====================================================
-// POST → Registrar una salida y restar stock
-// =====================================================
+// ===========================================
+// POST — REGISTRAR NUEVA SALIDA
+// ===========================================
 export async function POST(req: Request) {
   try {
     const { productoId, cantidad } = await req.json();
 
-    if (!productoId || !cantidad) {
+    // Validaciones básicas
+    if (!productoId || !cantidad || cantidad <= 0) {
       return NextResponse.json(
-        { error: "Todos los campos son obligatorios" },
+        { error: "Datos inválidos" },
         { status: 400 }
       );
     }
 
-    // Buscar producto
+    // Verificar producto
     const producto = await prisma.producto.findUnique({
       where: { id: Number(productoId) },
     });
@@ -43,34 +50,41 @@ export async function POST(req: Request) {
       );
     }
 
+    // Validar stock suficiente
     if (producto.stock < cantidad) {
       return NextResponse.json(
-        { error: "No hay suficiente stock para esta salida" },
-        { status: 400 }
+        { error: "Stock insuficiente" },
+        { status: 409 }
       );
     }
 
-    // Registrar salida
-    const salida = await prisma.salida.create({
-      data: {
-        productoId: Number(productoId),
-        cantidad: Number(cantidad),
-      },
+    // Registrar salida + restar stock
+    const nuevaSalida = await prisma.$transaction(async (tx) => {
+      const salida = await tx.salida.create({
+        data: {
+          productoId: Number(productoId),
+          cantidad: Number(cantidad),
+        },
+      });
+
+      await tx.producto.update({
+        where: { id: Number(productoId) },
+        data: {
+          stock: {
+            decrement: Number(cantidad),
+          },
+        },
+      });
+
+      return salida;
     });
 
-    // Restar stock
-    await prisma.producto.update({
-      where: { id: Number(productoId) },
-      data: {
-        stock: producto.stock - cantidad,
-      },
-    });
+    return NextResponse.json(nuevaSalida, { status: 201 });
 
-    return NextResponse.json(salida);
   } catch (error) {
-    console.error("Error creando salida:", error);
+    console.error("❌ Error POST salidas:", error);
     return NextResponse.json(
-      { error: "Error al registrar la salida" },
+      { error: "Error al registrar salida" },
       { status: 500 }
     );
   }
