@@ -24,7 +24,7 @@ export async function GET() {
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => {});
 
-    // TÍTULO
+    // ENCABEZADO
     doc
       .fontSize(22)
       .fillColor("#0DE67B")
@@ -35,14 +35,15 @@ export async function GET() {
     doc
       .fontSize(12)
       .fillColor("#FFFFFF")
-      .text("Fecha de generación: " + new Date().toLocaleString());
+      .text("Fecha de generación: " + new Date().toLocaleDateString());
 
     doc.moveDown();
 
     // ============================================================
-    // RECETAS
+    // LISTA DE RECETAS
     // ============================================================
     recetas.forEach((receta) => {
+      // Título de receta
       doc
         .fontSize(16)
         .fillColor("#0DE67B")
@@ -59,6 +60,7 @@ export async function GET() {
 
       let totalReceta = 0;
 
+      // INGREDIENTES
       receta.ingredientes.forEach((ing) => {
         const costoUnit = Number(ing.producto?.precioUnitario) || 0;
         const subtotal = costoUnit * Number(ing.cantidad);
@@ -69,7 +71,7 @@ export async function GET() {
           .fillColor("#FFFFFF")
           .text(
             `• ${ing.producto?.nombre || "Producto"} — ${ing.cantidad} ${
-              ing.unidad
+              ing.producto?.unidad || ""
             } (Costo: $${subtotal.toFixed(2)})`
           );
       });
@@ -83,16 +85,16 @@ export async function GET() {
         .text(`Costo total de esta receta: $${totalReceta.toFixed(2)}`);
 
       doc.moveDown(1);
+
+      // Separador
       doc
-        .fillColor("#444")
-        .text("-----------------------------------------------");
+        .fillColor("#555")
+        .text("----------------------------------------------------");
 
       doc.moveDown(1);
     });
 
-    // ============================================================
-    // ENVIAR PDF
-    // ============================================================
+    // FINALIZAR
     doc.end();
     await new Promise<void>((resolve) => doc.on("end", resolve));
 
