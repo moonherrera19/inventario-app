@@ -22,7 +22,10 @@ export async function GET() {
     const safe = (v: any) =>
       v === undefined || v === null ? "" : String(v);
 
-    // ******* FIX IMPORTANTE *******
+    const num = (v: any) =>
+      v === undefined || v === null || isNaN(Number(v))
+        ? 0
+        : Number(v);
 
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => {});
@@ -71,8 +74,13 @@ export async function GET() {
       doc.moveDown(0.5);
 
       receta.ingredientes.forEach((ing) => {
-        const costoUnit = Number(ing.producto?.precioUnitario) || 0;
-        const cantidad = Number(ing.cantidad) || 0;
+        const producto = ing.producto;
+
+        const costoUnit = num(producto?.precioUnitario);
+        const cantidad = num(ing.cantidad);
+        const unidad = safe(producto?.unidad);
+        const nombreProd = safe(producto?.nombre);
+
         const subtotal = costoUnit * cantidad;
         totalReceta += subtotal;
 
@@ -80,9 +88,7 @@ export async function GET() {
           .fontSize(11)
           .fillColor("#FFFFFF")
           .text(
-            `• ${safe(ing.producto?.nombre)} — ${cantidad} ${safe(
-              ing.producto?.unidad
-            )} (Costo: $${subtotal.toFixed(2)})`
+            `• ${nombreProd} — ${cantidad} ${unidad} (Costo: $${subtotal.toFixed(2)})`
           );
 
         if (doc.y > 750) {
