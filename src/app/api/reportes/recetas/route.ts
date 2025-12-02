@@ -8,107 +8,121 @@ export async function GET() {
       orderBy: { id: "desc" },
       include: {
         ingredientes: {
-          include: {
-            producto: true,
-          },
+          include: { producto: true },
         },
       },
     });
 
-    // ============================================================
-    // CREAR PDF
-    // ============================================================
+    // ============================
+    // CREAR PDF + BUFFER (obligatorio en Vercel)
+    // ============================
     const doc = new PDFDocument({ size: "A4", margin: 40 });
     const chunks: Buffer[] = [];
+    const safe = (v: any) =>
+      v === undefined || v === null ? "" : String(v);
 
-    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => {});
 
+    // ============================
     // ENCABEZADO
+    // ============================
     doc
       .fontSize(22)
       .fillColor("#0DE67B")
       .text("Reporte de Recetas", { align: "center" });
 
     doc.moveDown();
-
     doc
       .fontSize(12)
-      .fillColor("#FFFFFF")
-      .text("Fecha de generación: " + new Date().toLocaleDateString());
+      .fillColor("#ccc")
+      .text("Fecha de generación: " + new Date().toLocaleString());
 
     doc.moveDown();
+    doc
+      .moveTo(40, doc.y)
+      .lineTo(550, doc.y)
+      .strokeColor("#0DE67B")
+      .stroke();
 
-    // ============================================================
+    doc.moveDown(2);
+
+    // ============================
     // LISTA DE RECETAS
-    // ============================================================
+    // ============================
     recetas.forEach((receta) => {
-      // Título de receta
       doc
         .fontSize(16)
         .fillColor("#0DE67B")
-        .text(`🍃 Receta: ${receta.nombre}`);
+        .text(`🍃 Receta: ${safe(receta.nombre)}`);
 
       doc.moveDown(0.5);
+
+      let totalReceta = 0;
 
       doc
         .fontSize(12)
         .fillColor("#FFFFFF")
         .text("Ingredientes:", { underline: true });
 
-      doc.moveDown(0.3);
+      doc.moveDown(0.5);
 
-      let totalReceta = 0;
-
-      // INGREDIENTES
       receta.ingredientes.forEach((ing) => {
         const costoUnit = Number(ing.producto?.precioUnitario) || 0;
-        const subtotal = costoUnit * Number(ing.cantidad);
+        const cantidad = Number(ing.cantidad) || 0;
+        const subtotal = costoUnit * cantidad;
         totalReceta += subtotal;
 
         doc
           .fontSize(11)
           .fillColor("#FFFFFF")
           .text(
-            `• ${ing.producto?.nombre || "Producto"} — ${ing.cantidad} ${
-              ing.producto?.unidad || ""
-            } (Costo: $${subtotal.toFixed(2)})`
+            `• ${safe(ing.producto?.nombre)} — ${cantidad} ${safe(ing.producto?.unidad)} (Costo: $${subtotal.toFixed(2)})`
           );
+
+        // Salto de página seguro
+        if (doc.y > 750) {
+          doc.addPage();
+          doc.moveDown();
+        }
       });
 
       doc.moveDown();
-
-      // TOTAL POR RECETA
       doc
         .fontSize(13)
         .fillColor("#0DE67B")
-        .text(`Costo total de esta receta: $${totalReceta.toFixed(2)}`);
+        .text(`Costo total de la receta: $${totalReceta.toFixed(2)}`);
 
-      doc.moveDown(1);
+      doc.moveDown(1.5);
 
-      // Separador
       doc
-        .fillColor("#555")
-        .text("----------------------------------------------------");
+        .fillColor("#444")
+        .text("-----------------------------------------------");
 
       doc.moveDown(1);
+
+      if (doc.y > 750) {
+        doc.addPage();
+        doc.moveDown();
+      }
     });
 
-    // FINALIZAR
+    // ============================
+    // FINALIZAR PDF
+    // ============================
     doc.end();
-    await new Promise<void>((resolve) => doc.on("end", resolve));
+    await new Promise((resolve) => doc.on("end", resolve));
 
     const pdfBuffer = Buffer.concat(chunks);
 
     return new NextResponse(pdfBuffer, {
-      status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": "attachment; filename=recetas.pdf",
+        "Content-Disposition": "inline; filename=recetas.pdf",
       },
     });
   } catch (error) {
-    console.error("❌ Error generando reporte de recetas:", error);
+    console.error("❌ Error PDF Recetas:", error);
     return NextResponse.json(
       { error: "Error generando reporte de recetas" },
       { status: 500 }

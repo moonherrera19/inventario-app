@@ -4,27 +4,19 @@ import PDFDocument from "pdfkit";
 
 export async function GET(req: Request) {
   try {
-    // Leer tipo del query
     const { searchParams } = new URL(req.url);
     const tipo = searchParams.get("tipo") || "diario";
 
-    // -----------------------------
-    // FILTROS POR TIPO
-    // -----------------------------
     const hoy = new Date();
     let desde = new Date();
 
-    if (tipo === "diario") {
-      desde.setDate(hoy.getDate() - 1);
-    } else if (tipo === "semanal") {
-      desde.setDate(hoy.getDate() - 7);
-    } else if (tipo === "mensual") {
-      desde.setMonth(hoy.getMonth() - 1);
-    }
+    if (tipo === "diario") desde.setDate(hoy.getDate() - 1);
+    if (tipo === "semanal") desde.setDate(hoy.getDate() - 7);
+    if (tipo === "mensual") desde.setMonth(hoy.getMonth() - 1);
 
-    // -----------------------------
-    // OBTENER DATOS
-    // -----------------------------
+    // ============================================================
+    // CONSULTAR BD
+    // ============================================================
     const entradas = await prisma.entrada.findMany({
       where: { fecha: { gte: desde } },
       include: { producto: true },
@@ -45,133 +37,139 @@ export async function GET(req: Request) {
       include: { producto: true, lote: true },
     });
 
-    // -----------------------------
-    // CREAR PDF
-    // -----------------------------
-    const doc = new PDFDocument({ margin: 40 });
+    // ============================================================
+    // CONFIGURAR PDF
+    // ============================================================
+    const doc = new PDFDocument({ size: "A4", margin: 40 });
+    const chunks: Buffer[] = [];
 
-    // Stream para devolver PDF
-    const stream = doc;
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => {});
 
-    // -----------------------------
-    // ENCABEZADO BONITO
-    // -----------------------------
+    // ============================================================
+    // ENCABEZADO
+    // ============================================================
     doc
       .fontSize(22)
       .fillColor("#22c55e")
       .text("Reporte Agrícola", { align: "center" });
 
-    doc.moveDown(0.5);
+    doc.moveDown();
     doc
-      .fontSize(14)
-      .fillColor("#ccc")
-      .text(`Tipo: ${tipo.toUpperCase()}`, { align: "center" });
+      .fontSize(12)
+      .fillColor("#ddd")
+      .text(`Periodo: ${tipo.toUpperCase()}`, { align: "center" });
+
     doc.moveDown(1);
 
-    // Línea verde
     doc
       .moveTo(40, doc.y)
       .lineTo(550, doc.y)
       .strokeColor("#22c55e")
       .stroke();
-    doc.moveDown(1.5);
 
-    // ===================================================
-    // FUNCIÓN PARA TABLAS BONITAS
-    // ===================================================
-    const drawTable = (titulo: string, headers: string[], rows: any[]) => {
+    doc.moveDown(2);
+
+    // ============================================================
+    // FUNCIÓN PARA TABLAS ESTABLES (NO FALLA EN VERCEL)
+    // ============================================================
+    const safe = (val: any) => (val === null || val === undefined ? "" : String(val));
+
+    const drawTable = (title: string, headers: string[], rows: any[]) => {
       if (!rows || rows.length === 0) return;
 
-      doc
-        .fontSize(16)
-        .fillColor("#22c55e")
-        .text(titulo, { underline: true });
+      doc.fontSize(16).fillColor("#22c55e").text(title);
       doc.moveDown(0.5);
 
-      doc.fontSize(11).fillColor("#ffffff");
+      doc.fontSize(11).fillColor("#22c55e");
+
+      let colWidth = (550 - 40) / headers.length;
 
       // Encabezados
-      doc.fillColor("#22c55e");
       headers.forEach((h, i) => {
-        doc.text(h, 40 + i * 150, doc.y, { width: 140 });
+        doc.text(h, 40 + i * colWidth, doc.y, { width: colWidth });
       });
-
       doc.moveDown(1);
 
-      // Filas
-      doc.fillColor("#ddd");
-      rows.forEach((r) => {
-        const vals = Object.values(r);
-        vals.forEach((val: any, i: number) => {
-          doc.text(String(val), 40 + i * 150, doc.y, {
-            width: 140,
-            continued: false,
-          });
-        });
-        doc.moveDown(0.5);
+      doc.fillColor("#fff");
 
-        // Salto de página si es necesario
-        if (doc.y > 720) doc.addPage();
+      rows.forEach((row) => {
+        headers.forEach((h, i) => {
+          let val = safe(row[h]);
+          doc.text(val, 40 + i * colWidth, doc.y, { width: colWidth });
+        });
+
+        doc.moveDown(0.7);
+
+        // SALTO DE PÁGINA AUTOMÁTICO
+        if (doc.y > 750) {
+          doc.addPage();
+          doc.moveDown();
+        }
       });
 
-      doc.moveDown(1.5);
+      doc.moveDown(2);
     };
 
-    // ===================================================
-    // TABLAS
-    // ===================================================
-
+    // ============================================================
+    // SECCIONES
+    // ============================================================
     drawTable(
       "Entradas",
-      ["Producto", "Cantidad", "Fecha"],
+      ["producto", "cantidad", "fecha"],
       entradas.map((e) => ({
-        producto: e.producto.nombre,
-        cantidad: e.cantidad,
+        producto: safe(e.producto?.nombre),
+        cantidad: safe(e.cantidad),
         fecha: new Date(e.fecha).toLocaleDateString(),
       }))
     );
 
     drawTable(
       "Salidas",
-      ["Producto", "Cantidad", "Fecha"],
+      ["producto", "cantidad", "fecha"],
       salidas.map((s) => ({
-        producto: s.producto.nombre,
-        cantidad: s.cantidad,
+        producto: safe(s.producto?.nombre),
+        cantidad: safe(s.cantidad),
         fecha: new Date(s.fecha).toLocaleDateString(),
       }))
     );
 
     drawTable(
       "Compras",
-      ["Producto", "Proveedor", "Costo Total"],
+      ["producto", "proveedor", "costo"],
       compras.map((c) => ({
-        producto: c.producto.nombre,
-        proveedor: c.proveedor.nombre,
+        producto: safe(c.producto?.nombre),
+        proveedor: safe(c.proveedor?.nombre),
         costo: `$${(c.costo * c.cantidad).toFixed(2)}`,
       }))
     );
 
     drawTable(
-      "Consumos por lote",
-      ["Lote", "Producto", "Cantidad"],
+      "Consumos",
+      ["lote", "producto", "cantidad"],
       consumos.map((c) => ({
-        lote: c.lote.nombre,
-        producto: c.producto.nombre,
-        cantidad: c.cantidad,
+        lote: safe(c.lote?.nombre),
+        producto: safe(c.producto?.nombre),
+        cantidad: safe(c.cantidad),
       }))
     );
 
-    // FINALIZAR
+    // ============================================================
+    // FINALIZAR PDF
+    // ============================================================
     doc.end();
+    await new Promise((resolve) => doc.on("end", resolve));
 
-    return new NextResponse(stream as any, {
+    const pdfBuffer = Buffer.concat(chunks);
+
+    return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename=reporte-${tipo}.pdf`,
+        "Content-Disposition": "inline; filename=reporte.pdf",
       },
     });
   } catch (error) {
-    console.error("❌ Error PDF:", error);
+    console.error("❌ Error PDF general:", error);
     return NextResponse.json(
       { message: "Error al generar PDF" },
       { status: 500 }
