@@ -13,36 +13,25 @@ export async function GET() {
       },
     });
 
-    // ============================
-    // CREAR PDF + BUFFER
-    // ============================
     const doc = new PDFDocument({ size: "A4", margin: 40 });
     const chunks: Buffer[] = [];
-
-    const safe = (v: any) =>
-      v === undefined || v === null ? "" : String(v);
-
-    const num = (v: any) =>
-      v === undefined || v === null || isNaN(Number(v))
-        ? 0
-        : Number(v);
 
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => {});
 
-    // ============================
+    const safe = (v: any) =>
+      v === undefined || v === null || v === "" ? "N/A" : String(v);
+
+    const num = (v: any) =>
+      v === undefined || v === null || isNaN(Number(v)) ? 0 : Number(v);
+
+    // =============================
     // ENCABEZADO
-    // ============================
+    // =============================
     doc
       .fontSize(22)
       .fillColor("#0DE67B")
-      .text("Reporte de Recetas", { align: "center" });
-
-    doc.moveDown();
-    doc
-      .fontSize(12)
-      .fillColor("#ccc")
-      .text("Fecha de generación: " + new Date().toLocaleString());
+      .text("REPORTE DE RECETAS", { align: "center" });
 
     doc.moveDown();
     doc
@@ -50,73 +39,85 @@ export async function GET() {
       .lineTo(550, doc.y)
       .strokeColor("#0DE67B")
       .stroke();
+    doc.moveDown(1.5);
 
-    doc.moveDown(2);
-
-    // ============================
-    // RECETAS
-    // ============================
+    // =============================
+    // TABLA: RECETAS UNA A UNA
+    // =============================
     recetas.forEach((receta) => {
       doc
         .fontSize(16)
         .fillColor("#0DE67B")
-        .text(`🍃 Receta: ${safe(receta.nombre)}`);
+        .text(`🍃 ${safe(receta.nombre)}`);
 
-      doc.moveDown(0.5);
-
-      let totalReceta = 0;
+      doc.moveDown(0.2);
 
       doc
         .fontSize(12)
         .fillColor("#FFFFFF")
         .text("Ingredientes:", { underline: true });
 
-      doc.moveDown(0.5);
+      doc.moveDown(0.6);
+
+      // Encabezado de tabla
+      doc.fontSize(11).fillColor("#0DE67B");
+      doc.text("Producto", 40, doc.y, { width: 200 });
+      doc.text("Cantidad", 240, doc.y, { width: 100 });
+      doc.text("Unidad", 340, doc.y, { width: 100 });
+      doc.text("Costo", 440, doc.y, { width: 100 });
+
+      doc.moveDown(0.3);
+      doc
+        .moveTo(40, doc.y)
+        .lineTo(550, doc.y)
+        .strokeColor("#0DE67B")
+        .stroke();
+
+      doc.moveDown(0.3);
+
+      let totalReceta = 0;
 
       receta.ingredientes.forEach((ing) => {
         const producto = ing.producto;
 
-        const costoUnit = num(producto?.precioUnitario);
+        const nombre = safe(producto?.nombre);
         const cantidad = num(ing.cantidad);
         const unidad = safe(producto?.unidad);
-        const nombreProd = safe(producto?.nombre);
+        const costoUnit = num(producto?.precioUnitario);
+        const subtotal = cantidad * costoUnit;
 
-        const subtotal = costoUnit * cantidad;
         totalReceta += subtotal;
 
-        doc
-          .fontSize(11)
-          .fillColor("#FFFFFF")
-          .text(
-            `• ${nombreProd} — ${cantidad} ${unidad} (Costo: $${subtotal.toFixed(2)})`
-          );
+        // FILAS
+        doc.fontSize(11).fillColor("#FFFFFF");
+        doc.text(nombre, 40, doc.y, { width: 200 });
+        doc.text(String(cantidad), 240, doc.y, { width: 100 });
+        doc.text(unidad, 340, doc.y, { width: 100 });
+        doc.text(`$${subtotal.toFixed(2)}`, 440, doc.y, { width: 100 });
 
-        if (doc.y > 750) {
+        doc.moveDown(0.5);
+
+        // Salto de página
+        if (doc.y > 740) {
           doc.addPage();
-          doc.moveDown();
         }
       });
 
-      doc.moveDown();
-      doc
-        .fontSize(13)
-        .fillColor("#0DE67B")
-        .text(`Costo total de la receta: $${totalReceta.toFixed(2)}`);
+      // TOTAL DE RECETA
+      doc.moveDown(0.4);
+      doc.fontSize(13).fillColor("#0DE67B");
+      doc.text(`Total receta: $${totalReceta.toFixed(2)}`);
 
-      doc.moveDown(1.5);
-
-      doc.fillColor("#444").text("-----------------------------------------------");
       doc.moveDown(1);
+      doc
+        .moveTo(40, doc.y)
+        .lineTo(550, doc.y)
+        .strokeColor("#444")
+        .stroke();
 
-      if (doc.y > 750) {
-        doc.addPage();
-        doc.moveDown();
-      }
+      doc.moveDown(1);
     });
 
-    // ============================
-    // FINALIZAR PDF
-    // ============================
     doc.end();
     await new Promise((resolve) => doc.on("end", resolve));
 
@@ -125,7 +126,7 @@ export async function GET() {
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": "inline; filename=recetas.pdf",
+        "Content-Disposition": "inline; filename=reporte-recetas.pdf",
       },
     });
   } catch (error) {
