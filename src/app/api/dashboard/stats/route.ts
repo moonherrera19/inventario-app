@@ -1,41 +1,33 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { startOfMonth, endOfMonth } from "date-fns";
 
 export async function GET() {
   try {
-    const productos = await prisma.producto.findMany();
-    const stockBajo = productos.filter(p => p.stock <= p.stockMinimo).length;
+    const totalProductos = await prisma.producto.count();
 
-    const valorInventario = productos.reduce((acc, p) => {
-      if (p.precioUnitario) acc += p.stock * p.precioUnitario;
-      return acc;
-    }, 0);
+    const stockBajo = await prisma.producto.count({
+      where: { stock: { lt: prisma.producto.fields.stockMinimo } }
+    });
+
+    const productos = await prisma.producto.findMany();
+    const valorInventario = productos.reduce(
+      (acc, p) => acc + (p.precioUnitario || 0) * p.stock,
+      0
+    );
 
     const comprasMes = await prisma.compra.aggregate({
       _sum: { costo: true },
-      where: { fecha: { gte: startOfMonth(new Date()), lte: endOfMonth(new Date()) } },
-    });
-
-    const entradasSemana = await prisma.entrada.groupBy({
-      by: ["fecha"],
-      _sum: { cantidad: true },
-    });
-
-    const salidasSemana = await prisma.salida.groupBy({
-      by: ["fecha"],
-      _sum: { cantidad: true },
     });
 
     return NextResponse.json({
-      totalProductos: productos.length,
+      totalProductos,
       stockBajo,
       valorInventario,
-      gastoMes: comprasMes._sum.costo || 0,
-      entradasSemana,
-      salidasSemana,
+      comprasMes: comprasMes._sum.costo || 0
     });
+
   } catch (e) {
-    return NextResponse.json({ error: "Error dashboard" }, { status: 500 });
+    console.error("ERROR /stats", e);
+    return NextResponse.json({ error: "Error en stats" }, { status: 500 });
   }
 }

@@ -4,17 +4,18 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const categorias = await prisma.categoria.findMany({
-      include: { productos: true },
+      include: { productos: true }
     });
 
-    const data = categorias.map((c) => ({
-      categoria: c.nombre,
-      total: c.productos.reduce((acc, p) => acc + p.stock, 0),
+    const data = categorias.map(cat => ({
+      nombre: cat.nombre,
+      total: cat.productos.length
     }));
 
     return NextResponse.json(data);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Error categorías" }, { status: 500 });
+
+  } catch (e) {
+    console.error("ERROR categorias", e);
+    return NextResponse.json([], { status: 500 });
   }
 }
