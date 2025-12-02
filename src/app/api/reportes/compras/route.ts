@@ -14,10 +14,11 @@ export async function GET() {
     // ============================
     const doc = new PDFDocument({ size: "A4", margin: 40 });
     const chunks: Buffer[] = [];
+
     const safe = (val: any) =>
       val === null || val === undefined ? "" : String(val);
 
-    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => {});
 
     // ============================
@@ -93,12 +94,9 @@ export async function GET() {
         .text(` ${new Date(c.fecha).toLocaleDateString()}`);
 
       doc.moveDown();
-      doc
-        .fillColor("#444")
-        .text("-----------------------------------------------");
+      doc.fillColor("#444").text("-----------------------------------------------");
       doc.moveDown(1.5);
 
-      // Salto de página seguro
       if (doc.y > 750) {
         doc.addPage();
         doc.moveDown();
