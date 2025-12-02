@@ -39,6 +39,9 @@ export async function GET() {
 
     doc.moveDown();
 
+    // ============================================================
+    // RECETAS
+    // ============================================================
     recetas.forEach((receta) => {
       doc
         .fontSize(16)
@@ -57,9 +60,8 @@ export async function GET() {
       let totalReceta = 0;
 
       receta.ingredientes.forEach((ing) => {
-        const costoUnit =
-          ing.producto?.costo || 0; // Si no hay costo en producto
-        const subtotal = costoUnit * ing.cantidad;
+        const costoUnit = Number(ing.producto?.precioUnitario) || 0;
+        const subtotal = costoUnit * Number(ing.cantidad);
         totalReceta += subtotal;
 
         doc
@@ -74,7 +76,7 @@ export async function GET() {
 
       doc.moveDown();
 
-      // TOTAL DE LA RECETA
+      // TOTAL POR RECETA
       doc
         .fontSize(13)
         .fillColor("#0DE67B")
@@ -88,9 +90,12 @@ export async function GET() {
       doc.moveDown(1);
     });
 
+    // ============================================================
+    // ENVIAR PDF
+    // ============================================================
     doc.end();
-
     await new Promise<void>((resolve) => doc.on("end", resolve));
+
     const pdfBuffer = Buffer.concat(chunks);
 
     return new NextResponse(pdfBuffer, {
