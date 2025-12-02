@@ -14,30 +14,35 @@ export async function GET() {
       },
     });
 
-    // Base PDF
+    // BASE PDF
     const { pdfDoc, page, width, height, font } = await crearPDFBase();
     let currentPage = page;
-    let y = height - 120;
+    let y = height - 130; // debajo del encabezado base
 
-    // TÍTULO
+    // ============================
+    //      TÍTULO DEL REPORTE
+    // ============================
     currentPage.drawText("REPORTE DE ENTRADAS", {
       x: 20,
       y,
       size: 18,
       font,
-      color: rgb(0, 0.5, 0.2),
+      color: rgb(0, 0.45, 0.2),
     });
 
     y -= 35;
 
-    // ENCABEZADOS
+    // ============================
+    //      ENCABEZADOS TABLA
+    // ============================
     currentPage.drawText("Fecha", { x: 20, y, size: 12, font });
     currentPage.drawText("Producto", { x: 140, y, size: 12, font });
-    currentPage.drawText("Cantidad", { x: 350, y, size: 12, font });
+    currentPage.drawText("Unidad", { x: 330, y, size: 12, font });
+    currentPage.drawText("Cantidad", { x: 430, y, size: 12, font });
 
     y -= 15;
 
-    // Línea
+    // Línea verde
     currentPage.drawLine({
       start: { x: 20, y },
       end: { x: width - 20, y },
@@ -47,20 +52,27 @@ export async function GET() {
 
     y -= 20;
 
-    // CONTENIDO
+    // ============================
+    //      CONTENIDO DE LA TABLA
+    // ============================
     for (const e of entradas) {
-      // Crear nueva página cuando no cabe más contenido
-      if (y < 80) {
+      // Crear nueva página cuando se llena
+      if (y < 70) {
         currentPage = pdfDoc.addPage([595.28, 841.89]);
         y = 800;
 
+        // Encabezados en cada página nueva
         currentPage.drawText("Fecha", { x: 20, y, size: 12, font });
         currentPage.drawText("Producto", { x: 140, y, size: 12, font });
-        currentPage.drawText("Cantidad", { x: 350, y, size: 12, font });
+        currentPage.drawText("Unidad", { x: 330, y, size: 12, font });
+        currentPage.drawText("Cantidad", { x: 430, y, size: 12, font });
 
         y -= 20;
       }
 
+      // ============================
+      //  FILA
+      // ============================
       currentPage.drawText(e.fecha.toISOString().slice(0, 10), {
         x: 20,
         y,
@@ -75,8 +87,15 @@ export async function GET() {
         font,
       });
 
-      currentPage.drawText(`${e.cantidad}`, {
-        x: 350,
+      currentPage.drawText(e.producto.unidad || "-", {
+        x: 330,
+        y,
+        size: 12,
+        font,
+      });
+
+      currentPage.drawText(String(e.cantidad), {
+        x: 430,
         y,
         size: 12,
         font,
@@ -85,19 +104,21 @@ export async function GET() {
       y -= 18;
     }
 
-    // GENERAR PDF
+    // ============================
+    //  GENERAR PDF FINAL
+    // ============================
     const pdfBytes = await pdfDoc.save();
 
     return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": "attachment; filename=entradas.pdf",
+        "Content-Disposition": "attachment; filename=reporte_entradas.pdf",
       },
     });
 
   } catch (error) {
-    console.error("ERROR PDF ENTRADAS:", error);
+    console.error("❌ ERROR PDF ENTRADAS:", error);
     return NextResponse.json({ msg: "Error generando PDF" }, { status: 500 });
   }
 }
