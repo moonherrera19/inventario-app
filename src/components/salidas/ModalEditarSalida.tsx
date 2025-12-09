@@ -2,7 +2,22 @@
 
 import { useState, useTransition } from "react";
 
-export default function ModalEditarSalida({ open, onClose, data, refresh }) {
+// ============================
+// TIPADO DE PROPS
+// ============================
+interface ModalEditarSalidaProps {
+  open: boolean;
+  onClose: () => void;
+  data: any;
+  refresh: () => void;
+}
+
+export default function ModalEditarSalida({
+  open,
+  onClose,
+  data,
+  refresh,
+}: ModalEditarSalidaProps) {
   const [cantidad, setCantidad] = useState(data?.cantidad || "");
   const [rancho, setRancho] = useState(data?.rancho || "");
   const [cultivo, setCultivo] = useState(data?.cultivo || "");
