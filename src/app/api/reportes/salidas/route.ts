@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { crearPDFBase } from "@/lib/pdf/basePDF";
 import { rgb } from "pdf-lib";
 
+// ======================================================
+// GET — Reporte PDF de Salidas
+// ======================================================
 export async function GET() {
   try {
     const salidas = await prisma.salida.findMany({
@@ -12,14 +15,12 @@ export async function GET() {
       include: { producto: true },
     });
 
-    // BASE PDF (encabezado general)
+    // BASE PDF
     const { pdfDoc, page, width, height, font } = await crearPDFBase();
     let currentPage = page;
     let y = height - 130;
 
-    // ============================
     // TÍTULO
-    // ============================
     currentPage.drawText("REPORTE DE SALIDAS", {
       x: 20,
       y,
@@ -30,13 +31,12 @@ export async function GET() {
 
     y -= 35;
 
-    // ============================
     // ENCABEZADOS
-    // ============================
     currentPage.drawText("Fecha", { x: 20, y, size: 12, font });
-    currentPage.drawText("Producto", { x: 140, y, size: 12, font });
-    currentPage.drawText("Unidad", { x: 330, y, size: 12, font });
-    currentPage.drawText("Salida", { x: 430, y, size: 12, font });
+    currentPage.drawText("Producto", { x: 120, y, size: 12, font });
+    currentPage.drawText("Rancho", { x: 280, y, size: 12, font });
+    currentPage.drawText("Cultivo", { x: 380, y, size: 12, font });
+    currentPage.drawText("Salida", { x: 480, y, size: 12, font });
 
     y -= 15;
 
@@ -49,56 +49,49 @@ export async function GET() {
 
     y -= 20;
 
-    // ============================
-    // CONTENIDO
-    // ============================
+    // FILAS
     for (const s of salidas) {
-      // Nueva página si no cabe
       if (y < 70) {
         currentPage = pdfDoc.addPage([595.28, 841.89]);
         y = 800;
 
         currentPage.drawText("Fecha", { x: 20, y, size: 12, font });
-        currentPage.drawText("Producto", { x: 140, y, size: 12, font });
-        currentPage.drawText("Unidad", { x: 330, y, size: 12, font });
-        currentPage.drawText("Salida", { x: 430, y, size: 12, font });
+        currentPage.drawText("Producto", { x: 120, y, size: 12, font });
+        currentPage.drawText("Rancho", { x: 280, y, size: 12, font });
+        currentPage.drawText("Cultivo", { x: 380, y, size: 12, font });
+        currentPage.drawText("Salida", { x: 480, y, size: 12, font });
 
         y -= 20;
       }
 
-      // FILA
-      currentPage.drawText(s.fecha.toISOString().slice(0, 10), {
-        x: 20,
-        y,
-        size: 12,
-        font,
-      });
+      currentPage.drawText(
+        s.fecha.toISOString().slice(0, 10),
+        { x: 20, y, size: 12, font }
+      );
 
-      currentPage.drawText(s.producto.nombre, {
-        x: 140,
-        y,
-        size: 12,
-        font,
-      });
+      currentPage.drawText(
+        s.producto.nombre,
+        { x: 120, y, size: 12, font }
+      );
 
-      currentPage.drawText(s.producto.unidad || "-", {
-        x: 330,
-        y,
-        size: 12,
-        font,
-      });
+      currentPage.drawText(
+        s.rancho || "-",
+        { x: 280, y, size: 12, font }
+      );
 
-      currentPage.drawText(String(s.cantidad), {
-        x: 430,
-        y,
-        size: 12,
-        font,
-      });
+      currentPage.drawText(
+        s.cultivo || "-",
+        { x: 380, y, size: 12, font }
+      );
+
+      currentPage.drawText(
+        String(s.cantidad),
+        { x: 480, y, size: 12, font }
+      );
 
       y -= 18;
     }
 
-    // FINAL
     const pdfBytes = await pdfDoc.save();
 
     return new NextResponse(Buffer.from(pdfBytes), {
@@ -115,5 +108,111 @@ export async function GET() {
       { error: "Error generando PDF" },
       { status: 500 }
     );
+  }
+}
+
+// ======================================================
+// POST — Crear nueva salida
+// ======================================================
+export async function POST(req: Request) {
+  try {
+    const { productoId, cantidad, rancho, cultivo } = await req.json();
+
+    if (!productoId || !cantidad)
+      return NextResponse.json({ error: "Producto y cantidad obligatorios" }, { status: 400 });
+
+    const producto = await prisma.producto.findUnique({
+      where: { id: productoId },
+    });
+
+    if (!producto)
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+
+    if (cantidad <= 0)
+      return NextResponse.json({ error: "Cantidad inválida" }, { status: 400 });
+
+    if (producto.stock < cantidad)
+      return NextResponse.json(
+        { error: `Stock insuficiente. Disponible: ${producto.stock}` },
+        { status: 400 }
+      );
+
+    // Crear salida
+    const salida = await prisma.salida.create({
+      data: {
+        productoId,
+        cantidad,
+        rancho: rancho ?? null,
+        cultivo: cultivo ?? null,
+      },
+    });
+
+    // Actualizar stock
+    await prisma.producto.update({
+      where: { id: productoId },
+      data: { stock: producto.stock - cantidad },
+    });
+
+    return NextResponse.json(salida);
+
+  } catch (error) {
+    console.error("❌ ERROR POST SALIDAS:", error);
+    return NextResponse.json({ error: "Error creando salida" }, { status: 500 });
+  }
+}
+
+// ======================================================
+// PUT — Editar salida existente
+// ======================================================
+export async function PUT(req: Request) {
+  try {
+    const { id, cantidad, rancho, cultivo } = await req.json();
+
+    if (!id)
+      return NextResponse.json({ error: "ID obligatorio" }, { status: 400 });
+
+    const original = await prisma.salida.findUnique({ where: { id } });
+
+    if (!original)
+      return NextResponse.json({ error: "Salida no encontrada" }, { status: 404 });
+
+    const producto = await prisma.producto.findUnique({
+      where: { id: original.productoId },
+    });
+
+    if (!producto)
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+
+    // Recalcular stock
+    const stockRecalculado =
+      producto.stock + original.cantidad - cantidad;
+
+    if (stockRecalculado < 0)
+      return NextResponse.json(
+        { error: `Stock insuficiente después del ajuste. Disponible: ${producto.stock}` },
+        { status: 400 }
+      );
+
+    // Actualizar salida
+    const salida = await prisma.salida.update({
+      where: { id },
+      data: {
+        cantidad,
+        rancho: rancho ?? null,
+        cultivo: cultivo ?? null,
+      },
+    });
+
+    // Actualizar stock real
+    await prisma.producto.update({
+      where: { id: producto.id },
+      data: { stock: stockRecalculado },
+    });
+
+    return NextResponse.json(salida);
+
+  } catch (error) {
+    console.error("❌ ERROR PUT SALIDAS:", error);
+    return NextResponse.json({ error: "Error actualizando salida" }, { status: 500 });
   }
 }

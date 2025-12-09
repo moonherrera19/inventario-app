@@ -38,10 +38,10 @@ model Usuario {
 // ========================================================
 
 model Categoria {
-  id        Int        @id @default(autoincrement())
-  nombre    String
+  id          Int        @id @default(autoincrement())
+  nombre      String
   descripcion String?
-  productos Producto[]
+  productos   Producto[]
 }
 
 model Proveedor {
@@ -49,7 +49,7 @@ model Proveedor {
   nombre    String
   telefono  String?
   direccion String?
-  productos Producto[]   // ← añadido
+  productos Producto[]
   compras   Compra[]
 }
 
@@ -58,14 +58,14 @@ model Proveedor {
 // ========================================================
 
 model Producto {
-  id            Int     @id @default(autoincrement())
-  nombre        String
-  unidad        String
-  categoriaId   Int?
-  proveedorId   Int?    // ← añadido
-  precioUnitario Float? // ← añadido (para costo por hectárea)
-  stock         Float   @default(0)
-  stockMinimo   Float   @default(0) // ← añadido
+  id             Int     @id @default(autoincrement())
+  nombre         String
+  unidad         String
+  categoriaId    Int?
+  proveedorId    Int?
+  precioUnitario Float?
+  stock          Float   @default(0)
+  stockMinimo    Float   @default(0)
 
   categoria     Categoria? @relation(fields: [categoriaId], references: [id])
   proveedor     Proveedor? @relation(fields: [proveedorId], references: [id])
@@ -77,7 +77,7 @@ model Producto {
   consumos      Consumo[]
 
   creadoEn      DateTime @default(now())
-  actualizadoEn DateTime @updatedAt // ← añadido
+  actualizadoEn DateTime @updatedAt
 }
 
 // ========================================================
@@ -98,6 +98,12 @@ model Salida {
   productoId Int
   cantidad   Float
   fecha      DateTime @default(now())
+
+  // ====================================
+  // NUEVOS CAMPOS TEXTO LIBRE
+  // ====================================
+  rancho     String?
+  cultivo    String?
 
   producto Producto @relation(fields: [productoId], references: [id])
 }

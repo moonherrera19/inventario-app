@@ -17,12 +17,14 @@ export default function ModalSalida({
 }: ModalSalidaProps) {
   const [productoId, setProductoId] = useState("");
   const [cantidad, setCantidad] = useState("");
+  const [rancho, setRancho] = useState("");
+  const [cultivo, setCultivo] = useState("");
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const guardar = () => {
     if (!productoId || !cantidad) {
-      setError("Todos los campos son obligatorios.");
+      setError("Producto y cantidad son obligatorios.");
       return;
     }
 
@@ -35,18 +37,25 @@ export default function ModalSalida({
         body: JSON.stringify({
           productoId: Number(productoId),
           cantidad: Number(cantidad),
+          rancho: rancho || null,
+          cultivo: cultivo || null,
         }),
       });
 
       if (!res.ok) {
-        setError("Error guardando la salida.");
+        const data = await res.json();
+        setError(data.error || "Error guardando la salida.");
         return;
       }
 
       onSuccess();
       onClose();
+
+      // limpiar campos
       setProductoId("");
       setCantidad("");
+      setRancho("");
+      setCultivo("");
     });
   };
 
@@ -55,6 +64,7 @@ export default function ModalSalida({
   return (
     <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-40">
       <div className="bg-[#1a1f25] w-96 p-6 rounded-xl border border-blue-700 shadow-xl">
+
         <h2 className="text-2xl font-bold text-blue-400 mb-4">Nueva Salida</h2>
 
         {/* Producto */}
@@ -81,6 +91,26 @@ export default function ModalSalida({
           className="w-full px-3 py-2 mb-3 bg-[#0f1217] border border-blue-700 rounded text-white"
         />
 
+        {/* Rancho */}
+        <label className="text-sm text-gray-300">Rancho</label>
+        <input
+          type="text"
+          value={rancho}
+          onChange={(e) => setRancho(e.target.value)}
+          placeholder="Rancho Los Ángeles, Rancho El Paraíso…"
+          className="w-full px-3 py-2 mb-3 bg-[#0f1217] border border-blue-700 rounded text-white"
+        />
+
+        {/* Cultivo */}
+        <label className="text-sm text-gray-300">Cultivo</label>
+        <input
+          type="text"
+          value={cultivo}
+          onChange={(e) => setCultivo(e.target.value)}
+          placeholder="Fresa, Zarzamora, Maíz…"
+          className="w-full px-3 py-2 mb-3 bg-[#0f1217] border border-blue-700 rounded text-white"
+        />
+
         {/* Error */}
         {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
 
@@ -91,6 +121,7 @@ export default function ModalSalida({
           >
             Cancelar
           </button>
+
           <button
             onClick={guardar}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg"
