@@ -26,7 +26,7 @@ export default function SalidasPage() {
 
   // MODAL EDITAR
   const [openEdit, setOpenEdit] = useState(false);
-  const [editData, setEditData] = useState<any>(null);
+  const [editData, setEditData] = useState<SalidaType | null>(null);
 
   // FILTROS
   const [filtroRancho, setFiltroRancho] = useState("");
@@ -100,16 +100,20 @@ export default function SalidasPage() {
         productos={productos}
       />
 
-      {/* MODAL EDITAR SALIDA */}
-      <ModalEditarSalida
-        open={openEdit}
-        onClose={() => setOpenEdit(false)}
-        data={editData}
-        refresh={cargarSalidas}
-      />
+      {/* ============================
+          MODAL EDITAR (RENDER SEGURO)
+      ============================ */}
+      {openEdit && editData && (
+        <ModalEditarSalida
+          open={openEdit}
+          onClose={() => setOpenEdit(false)}
+          data={editData}
+          refresh={cargarSalidas}
+        />
+      )}
 
       {/* ============================
-            FILTROS
+          FILTROS
       ============================ */}
       <div className="flex gap-4 mt-6 mb-4">
         <input
@@ -128,7 +132,7 @@ export default function SalidasPage() {
       </div>
 
       {/* ============================
-            MOVIMIENTOS RECIENTES
+            TABLA DE MOVIMIENTOS
       ============================ */}
       <div className="mt-4 bg-[#0f1217] p-4 rounded-lg border border-gray-700">
         <h2 className="text-xl font-semibold mb-4 text-white">
@@ -158,7 +162,6 @@ export default function SalidasPage() {
                 <td className="py-2">{s.cultivo || "-"}</td>
                 <td className="py-2 font-semibold text-red-400">{s.cantidad}</td>
 
-                {/* Botón Editar */}
                 <td className="py-2">
                   <button
                     onClick={() => abrirModalEditar(s)}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 
 // ============================
 // TIPADO DE PROPS
@@ -18,12 +18,28 @@ export default function ModalEditarSalida({
   data,
   refresh,
 }: ModalEditarSalidaProps) {
-  const [cantidad, setCantidad] = useState(data?.cantidad || "");
-  const [rancho, setRancho] = useState(data?.rancho || "");
-  const [cultivo, setCultivo] = useState(data?.cultivo || "");
+  
+  // Estados
+  const [cantidad, setCantidad] = useState("");
+  const [rancho, setRancho] = useState("");
+  const [cultivo, setCultivo] = useState("");
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
+  // ============================
+  // CARGAR DATA AL ABRIR MODAL
+  // ============================
+  useEffect(() => {
+    if (data && open) {
+      setCantidad(String(data.cantidad ?? ""));
+      setRancho(data.rancho ?? "");
+      setCultivo(data.cultivo ?? "");
+    }
+  }, [data, open]);
+
+  // ============================
+  // GUARDAR CAMBIOS
+  // ============================
   const guardar = async () => {
     if (!cantidad) {
       setError("La cantidad es obligatoria.");
@@ -31,6 +47,8 @@ export default function ModalEditarSalida({
     }
 
     startTransition(async () => {
+      setError("");
+
       const res = await fetch("/api/salidas", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -53,7 +71,10 @@ export default function ModalEditarSalida({
     });
   };
 
-  if (!open) return null;
+  // ============================
+  // NO RENDERIZAR SIN OPEN O DATA
+  // ============================
+  if (!open || !data) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50">
