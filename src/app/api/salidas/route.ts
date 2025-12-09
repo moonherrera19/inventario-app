@@ -28,9 +28,8 @@ export async function GET() {
 // ===========================================
 export async function POST(req: Request) {
   try {
-    const { productoId, cantidad } = await req.json();
+    const { productoId, cantidad, rancho, cultivo } = await req.json();
 
-    // Validaciones básicas
     if (!productoId || !cantidad || cantidad <= 0) {
       return NextResponse.json(
         { error: "Datos inválidos" },
@@ -38,7 +37,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verificar producto
     const producto = await prisma.producto.findUnique({
       where: { id: Number(productoId) },
     });
@@ -50,7 +48,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validar stock suficiente
     if (producto.stock < cantidad) {
       return NextResponse.json(
         { error: "Stock insuficiente" },
@@ -58,12 +55,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // Registrar salida + restar stock
+    // Registrar salida + actualizar stock
     const nuevaSalida = await prisma.$transaction(async (tx) => {
       const salida = await tx.salida.create({
         data: {
           productoId: Number(productoId),
           cantidad: Number(cantidad),
+          rancho: rancho || null,
+          cultivo: cultivo || null,
         },
       });
 
@@ -85,6 +84,52 @@ export async function POST(req: Request) {
     console.error("❌ Error POST salidas:", error);
     return NextResponse.json(
       { error: "Error al registrar salida" },
+      { status: 500 }
+    );
+  }
+}
+
+// ===========================================
+// PUT — EDITAR RANCHO / CULTIVO / CANTIDAD SIN AFECTAR STOCK
+// ===========================================
+export async function PUT(req: Request) {
+  try {
+    const { id, cantidad, rancho, cultivo } = await req.json();
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID obligatorio" },
+        { status: 400 }
+      );
+    }
+
+    const salidaExistente = await prisma.salida.findUnique({
+      where: { id },
+    });
+
+    if (!salidaExistente) {
+      return NextResponse.json(
+        { error: "Salida no encontrada" },
+        { status: 404 }
+      );
+    }
+
+    // *** NO MODIFICAMOS STOCK ***
+    const salida = await prisma.salida.update({
+      where: { id },
+      data: {
+        cantidad: Number(cantidad),
+        rancho: rancho || null,
+        cultivo: cultivo || null,
+      },
+    });
+
+    return NextResponse.json(salida);
+
+  } catch (error) {
+    console.error("❌ Error PUT salidas:", error);
+    return NextResponse.json(
+      { error: "Error al actualizar salida" },
       { status: 500 }
     );
   }
