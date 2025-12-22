@@ -59,10 +59,10 @@ export default function Sidebar() {
           Salidas
         </Link>
 
-        {/* 🔥 INVENTARIO POR LOTE */}
+        {/* 🔥 INVENTARIO POR LOTE (CORREGIDO) */}
         <Link
-          href="/dashboard/lotes"
-          className={linkClass("/dashboard/lotes")}
+          href="/dashboard/inventario-lotes"
+          className={linkClass("/dashboard/inventario-lotes")}
         >
           Inventario por Lote
         </Link>
