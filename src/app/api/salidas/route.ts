@@ -10,6 +10,7 @@ export async function GET() {
       orderBy: { fecha: "desc" },
       include: {
         producto: true,
+        inventarioLote: true,
       },
     });
 
@@ -24,7 +25,7 @@ export async function GET() {
 }
 
 // ===========================================
-// POST — REGISTRAR NUEVA SALIDA
+// POST — REGISTRAR SALIDA (FIFO AUTOMÁTICO)
 // ===========================================
 export async function POST(req: Request) {
   try {
@@ -55,17 +56,58 @@ export async function POST(req: Request) {
       );
     }
 
-    // Registrar salida + actualizar stock
-    const nuevaSalida = await prisma.$transaction(async (tx) => {
-      const salida = await tx.salida.create({
-        data: {
+    // 🔁 FIFO AUTOMÁTICO
+    const resultado = await prisma.$transaction(async (tx) => {
+      let restante = Number(cantidad);
+      const salidasCreadas = [];
+
+      // 1️⃣ Obtener lotes disponibles ordenados por caducidad
+      const lotes = await tx.inventarioLote.findMany({
+        where: {
           productoId: Number(productoId),
-          cantidad: Number(cantidad),
-          rancho: rancho || null,
-          cultivo: cultivo || null,
+          cantidadDisponible: { gt: 0 },
         },
+        orderBy: [
+          { fechaCaducidad: "asc" },
+          { fechaEntrada: "asc" },
+        ],
       });
 
+      for (const lote of lotes) {
+        if (restante <= 0) break;
+
+        const descontar = Math.min(lote.cantidadDisponible, restante);
+
+        // 2️⃣ Actualizar lote
+        await tx.inventarioLote.update({
+          where: { id: lote.id },
+          data: {
+            cantidadDisponible: {
+              decrement: descontar,
+            },
+          },
+        });
+
+        // 3️⃣ Registrar salida ligada al lote
+        const salida = await tx.salida.create({
+          data: {
+            productoId: Number(productoId),
+            inventarioLoteId: lote.id,
+            cantidad: descontar,
+            rancho: rancho || null,
+            cultivo: cultivo || null,
+          },
+        });
+
+        salidasCreadas.push(salida);
+        restante -= descontar;
+      }
+
+      if (restante > 0) {
+        throw new Error("No hay suficiente inventario por lote");
+      }
+
+      // 4️⃣ Actualizar stock total del producto
       await tx.producto.update({
         where: { id: Number(productoId) },
         data: {
@@ -75,22 +117,29 @@ export async function POST(req: Request) {
         },
       });
 
-      return salida;
+      return salidasCreadas;
     });
 
-    return NextResponse.json(nuevaSalida, { status: 201 });
+    return NextResponse.json(
+      {
+        ok: true,
+        message: "Salida registrada con FIFO por lote",
+        salidas: resultado,
+      },
+      { status: 201 }
+    );
 
   } catch (error) {
-    console.error("❌ Error POST salidas:", error);
+    console.error("❌ Error POST salidas FIFO:", error);
     return NextResponse.json(
-      { error: "Error al registrar salida" },
+      { error: "Error al registrar salida por lote" },
       { status: 500 }
     );
   }
 }
 
 // ===========================================
-// PUT — EDITAR RANCHO / CULTIVO / CANTIDAD SIN AFECTAR STOCK
+// PUT — EDITAR METADATOS (NO TOCA STOCK)
 // ===========================================
 export async function PUT(req: Request) {
   try {
@@ -114,7 +163,7 @@ export async function PUT(req: Request) {
       );
     }
 
-    // *** NO MODIFICAMOS STOCK ***
+    // ❗ NO SE MODIFICA INVENTARIO AQUÍ
     const salida = await prisma.salida.update({
       where: { id },
       data: {

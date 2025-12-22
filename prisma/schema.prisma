@@ -45,7 +45,7 @@ model Categoria {
 }
 
 model Proveedor {
-  id        Int       @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   nombre    String
   telefono  String?
   direccion String?
@@ -58,26 +58,45 @@ model Proveedor {
 // ========================================================
 
 model Producto {
-  id             Int     @id @default(autoincrement())
+  id             Int    @id @default(autoincrement())
   nombre         String
   unidad         String
   categoriaId    Int?
   proveedorId    Int?
   precioUnitario Float?
-  stock          Float   @default(0)
-  stockMinimo    Float   @default(0)
+  stock          Float  @default(0)
+  stockMinimo    Float  @default(0)
 
-  categoria     Categoria? @relation(fields: [categoriaId], references: [id])
-  proveedor     Proveedor? @relation(fields: [proveedorId], references: [id])
+  categoria Categoria? @relation(fields: [categoriaId], references: [id])
+  proveedor Proveedor? @relation(fields: [proveedorId], references: [id])
 
-  entradas      Entrada[]
-  salidas       Salida[]
-  compras       Compra[]
-  ingredientes  Ingrediente[]
-  consumos      Consumo[]
+  entradas        Entrada[]
+  salidas         Salida[]
+  compras         Compra[]
+  ingredientes    Ingrediente[]
+  consumos        Consumo[]
+  inventarioLotes InventarioLote[]
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
+}
+
+// ========================================================
+// INVENTARIO POR LOTE (LOTE + CADUCIDAD)
+// ========================================================
+
+model InventarioLote {
+  id                 Int       @id @default(autoincrement())
+  productoId         Int
+  loteCodigo         String
+  fechaCaducidad     DateTime?
+  cantidadDisponible Float
+  fechaEntrada       DateTime  @default(now())
+
+  producto Producto @relation(fields: [productoId], references: [id])
+  salidas  Salida[] // 👈 RELACIÓN INVERSA CORRECTA
+
+  @@index([productoId])
 }
 
 // ========================================================
@@ -94,18 +113,17 @@ model Entrada {
 }
 
 model Salida {
-  id         Int      @id @default(autoincrement())
-  productoId Int
-  cantidad   Float
-  fecha      DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  productoId       Int
+  inventarioLoteId Int?
+  cantidad         Float
+  fecha            DateTime @default(now())
 
-  // ====================================
-  // NUEVOS CAMPOS TEXTO LIBRE
-  // ====================================
-  rancho     String?
-  cultivo    String?
+  rancho  String?
+  cultivo String?
 
-  producto Producto @relation(fields: [productoId], references: [id])
+  producto       Producto        @relation(fields: [productoId], references: [id])
+  inventarioLote InventarioLote? @relation(fields: [inventarioLoteId], references: [id])
 }
 
 // ========================================================
@@ -145,7 +163,7 @@ model Ingrediente {
 }
 
 // ========================================================
-// REGISTROS AGRÍCOLAS PROFESIONALES
+// REGISTROS AGRÍCOLAS PROFESIONALES (LOTES DE CAMPO)
 // ========================================================
 
 model Lote {
