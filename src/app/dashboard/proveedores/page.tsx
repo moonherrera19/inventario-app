@@ -12,9 +12,9 @@ export default function ProveedoresPage() {
 
   const [isPending, startTransition] = useTransition();
 
-  // ------------------------------------------------------
+  // ======================================================
   // CARGAR PROVEEDORES
-  // ------------------------------------------------------
+  // ======================================================
   const cargarProveedores = async () => {
     try {
       setLoading(true);
@@ -33,9 +33,9 @@ export default function ProveedoresPage() {
     cargarProveedores();
   }, []);
 
-  // ------------------------------------------------------
+  // ======================================================
   // ELIMINAR PROVEEDOR
-  // ------------------------------------------------------
+  // ======================================================
   const eliminarProveedor = async (id: number) => {
     if (!confirm("¿Seguro que deseas eliminar este proveedor?")) return;
 
@@ -54,19 +54,22 @@ export default function ProveedoresPage() {
 
   return (
     <div className="min-h-screen p-6 bg-[#0f1217] text-white">
+      {/* ================================================== */}
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
+      {/* ================================================== */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <h1 className="text-4xl font-bold text-green-400">
           Proveedores
         </h1>
 
         <div className="flex gap-3">
-          {/* ⚠️ ESTE BOTÓN LO USAMOS DESPUÉS */}
+          {/* PREPARADO PARA EXCEL */}
           <button
             disabled
-            className="bg-gray-600 px-4 py-2 rounded-xl opacity-50 cursor-not-allowed"
+            title="Próximamente"
+            className="bg-gray-700 px-4 py-2 rounded-xl opacity-50 cursor-not-allowed"
           >
-            Importar Excel (próximo)
+            Importar Excel
           </button>
 
           <button
@@ -81,23 +84,28 @@ export default function ProveedoresPage() {
         </div>
       </div>
 
+      {/* ================================================== */}
       {/* TABLA */}
-      <div className="bg-[#1a1f25] p-4 rounded-xl border border-green-800/40">
+      {/* ================================================== */}
+      <div className="bg-[#1a1f25] p-4 rounded-xl border border-green-800/40 shadow-lg">
         {loading ? (
           <p className="text-gray-400">Cargando proveedores…</p>
         ) : proveedores.length === 0 ? (
-          <p className="text-gray-400">No hay proveedores registrados.</p>
+          <p className="text-gray-400">
+            No hay proveedores registrados.
+          </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="min-w-[1200px] w-full text-sm">
               <thead>
                 <tr className="text-green-300 border-b border-green-800/40">
-                  <th>Nombre</th>
-                  <th>Banco</th>
-                  <th>Cuenta</th>
-                  <th>CLABE</th>
+                  <th className="py-3">Nombre</th>
+                  <th>Banco MXN</th>
+                  <th>Cuenta MXN</th>
+                  <th>CLABE MXN</th>
                   <th>Banco USD</th>
                   <th>Cuenta USD</th>
+                  <th>CLABE USD</th>
                   <th>RFC</th>
                   <th className="text-center">Acciones</th>
                 </tr>
@@ -109,7 +117,7 @@ export default function ProveedoresPage() {
                     key={p.id}
                     className="border-b border-green-800/20 hover:bg-green-900/10"
                   >
-                    <td className="font-semibold text-green-400">
+                    <td className="font-semibold text-green-400 py-2">
                       {p.nombre}
                     </td>
                     <td>{p.banco || "-"}</td>
@@ -117,6 +125,7 @@ export default function ProveedoresPage() {
                     <td>{p.clabe || "-"}</td>
                     <td>{p.bancoDolares || "-"}</td>
                     <td>{p.numeroCuentaDolares || "-"}</td>
+                    <td>{p.clabeDolares || "-"}</td>
                     <td>{p.rfc || "-"}</td>
 
                     <td className="flex gap-2 justify-center py-2">
@@ -125,13 +134,15 @@ export default function ProveedoresPage() {
                           setEditData(p);
                           setOpenModal(true);
                         }}
-                        className="px-3 py-1 bg-blue-600 rounded-md"
+                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md"
                       >
                         Editar
                       </button>
+
                       <button
                         onClick={() => eliminarProveedor(p.id)}
-                        className="px-3 py-1 bg-red-600 rounded-md"
+                        disabled={isPending}
+                        className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-md"
                       >
                         Eliminar
                       </button>
@@ -144,7 +155,9 @@ export default function ProveedoresPage() {
         )}
       </div>
 
+      {/* ================================================== */}
       {/* MODAL */}
+      {/* ================================================== */}
       {openModal && (
         <ModalProveedor
           close={() => setOpenModal(false)}
