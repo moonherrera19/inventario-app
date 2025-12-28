@@ -34,6 +34,33 @@ export default function ProveedoresPage() {
   }, []);
 
   // ======================================================
+  // IMPORTAR EXCEL
+  // ======================================================
+  const importarExcel = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/proveedores/import", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          throw new Error("Error al importar");
+        }
+
+        alert("Proveedores importados correctamente");
+        cargarProveedores();
+      } catch (error) {
+        console.error(error);
+        alert("Error al importar proveedores");
+      }
+    });
+  };
+
+  // ======================================================
   // ELIMINAR PROVEEDOR
   // ======================================================
   const eliminarProveedor = async (id: number) => {
@@ -62,16 +89,28 @@ export default function ProveedoresPage() {
           Proveedores
         </h1>
 
-        <div className="flex gap-3">
-          {/* PREPARADO PARA EXCEL */}
-          <button
-            disabled
-            title="Próximamente"
-            className="bg-gray-700 px-4 py-2 rounded-xl opacity-50 cursor-not-allowed"
+        <div className="flex gap-3 items-center">
+          {/* IMPORTAR EXCEL */}
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            id="importExcel"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) importarExcel(file);
+              e.currentTarget.value = "";
+            }}
+          />
+
+          <label
+            htmlFor="importExcel"
+            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl font-semibold cursor-pointer"
           >
             Importar Excel
-          </button>
+          </label>
 
+          {/* NUEVO PROVEEDOR */}
           <button
             onClick={() => {
               setEditData(null);
@@ -96,7 +135,7 @@ export default function ProveedoresPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[1200px] w-full text-sm">
+            <table className="min-w-[1300px] w-full text-sm">
               <thead>
                 <tr className="text-green-300 border-b border-green-800/40">
                   <th className="py-3">Nombre</th>
