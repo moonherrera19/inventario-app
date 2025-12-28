@@ -23,14 +23,16 @@ model Rol {
 }
 
 model Usuario {
-  id       Int    @id @default(autoincrement())
-  nombre   String
-  correo   String @unique
-  password String
-  rolId    Int
+  id        Int    @id @default(autoincrement())
+  nombre    String
+  correo    String @unique
+  password  String
+  rolId     Int
 
-  rol      Rol      @relation(fields: [rolId], references: [id])
-  creadoEn DateTime @default(now())
+  rol       Rol      @relation(fields: [rolId], references: [id])
+  creadoEn  DateTime @default(now())
+
+  comprasAdmin CompraAdministrativa[]
 }
 
 // ========================================================
@@ -49,8 +51,10 @@ model Proveedor {
   nombre    String
   telefono  String?
   direccion String?
-  productos Producto[]
-  compras   Compra[]
+
+  productos    Producto[]
+  compras      Compra[]
+  comprasAdmin CompraAdministrativa[]
 }
 
 // ========================================================
@@ -94,13 +98,13 @@ model InventarioLote {
   fechaEntrada       DateTime  @default(now())
 
   producto Producto @relation(fields: [productoId], references: [id])
-  salidas  Salida[] // 👈 RELACIÓN INVERSA CORRECTA
+  salidas  Salida[]
 
   @@index([productoId])
 }
 
 // ========================================================
-// MOVIMIENTOS
+// MOVIMIENTOS DE INVENTARIO
 // ========================================================
 
 model Entrada {
@@ -127,7 +131,7 @@ model Salida {
 }
 
 // ========================================================
-// COMPRAS
+// COMPRAS OPERATIVAS (AFECTAN INVENTARIO)
 // ========================================================
 
 model Compra {
@@ -140,6 +144,52 @@ model Compra {
 
   producto  Producto  @relation(fields: [productoId], references: [id])
   proveedor Proveedor @relation(fields: [proveedorId], references: [id])
+}
+
+// ========================================================
+// COMPRAS ADMINISTRATIVAS (FACTURAS / EXCEL / ESTATUS)
+// ========================================================
+
+enum EstatusCompra {
+  CAPTURADA
+  APROBADA
+  PAGADA
+}
+
+model CompraAdministrativa {
+  id            Int           @id @default(autoincrement())
+
+  // Relaciones
+  proveedorId   Int
+  usuarioId     Int?
+
+  // Datos tipo Excel / Factura
+  numeroFactura String?
+  banco         String?
+  cuentaClabe   String?
+  empresa       String?
+  moneda        String        @default("MXN")
+
+  concepto      String
+  precio        Float?
+  monto         Float
+
+  fechaFactura  DateTime?
+  fechaPago     DateTime?
+
+  // Control administrativo
+  estatus       EstatusCompra @default(CAPTURADA)
+  observaciones String?
+
+  // Auditoría
+  creadoEn      DateTime      @default(now())
+  actualizadoEn DateTime      @updatedAt
+
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id])
+  usuario   Usuario?  @relation(fields: [usuarioId], references: [id])
+
+  @@index([estatus])
+  @@index([proveedorId])
 }
 
 // ========================================================

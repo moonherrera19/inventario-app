@@ -73,6 +73,12 @@ export default function Sidebar() {
         >
           Compras
         </Link>
+        <Link
+  href="/dashboard/compras-admin"
+  className={linkClass("/dashboard/compras-admin")}
+>
+  Compras Administrativas
+</Link>
 
         <Link
           href="/dashboard/recetas"
