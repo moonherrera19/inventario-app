@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// ============================================
-// GET - Obtener todos los proveedores
-// ============================================
+// ======================================================
+// GET — Obtener todos los proveedores
+// ======================================================
 export async function GET() {
   try {
     const proveedores = await prisma.proveedor.findMany({
-      orderBy: { id: "desc" },
+      orderBy: { nombre: "asc" },
     });
 
     return NextResponse.json(proveedores);
@@ -20,30 +20,53 @@ export async function GET() {
   }
 }
 
-// ============================================
-// POST - Crear proveedor
-// ============================================
-export async function POST(req: Request) {
+// ======================================================
+// POST — Crear proveedor (manual / formulario)
+// ======================================================
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { nombre, telefono, direccion } = body;
+
+    const {
+      nombre,
+      telefono,
+      correo,
+      direccion,
+      rfc,
+      banco,
+      numeroCuenta,
+      clabe,
+      bancoDolares,
+      numeroCuentaDolares,
+      clabeDolares,
+    } = body;
 
     if (!nombre || nombre.trim() === "") {
       return NextResponse.json(
-        { message: "El nombre es obligatorio" },
+        { message: "El nombre del proveedor es obligatorio" },
         { status: 400 }
       );
     }
 
-    const nuevo = await prisma.proveedor.create({
+    const proveedor = await prisma.proveedor.create({
       data: {
-        nombre,
+        nombre: nombre.trim(),
         telefono: telefono || null,
+        correo: correo || null,
         direccion: direccion || null,
+        rfc: rfc || null,
+
+        banco: banco || null,
+        numeroCuenta: numeroCuenta || null,
+        clabe: clabe || null,
+
+        bancoDolares: bancoDolares || null,
+        numeroCuentaDolares: numeroCuentaDolares || null,
+        clabeDolares: clabeDolares || null,
       },
     });
 
-    return NextResponse.json(nuevo, { status: 201 });
+    return NextResponse.json(proveedor, { status: 201 });
   } catch (error) {
     console.error("❌ Error POST proveedores:", error);
     return NextResponse.json(
@@ -53,13 +76,27 @@ export async function POST(req: Request) {
   }
 }
 
-// ============================================
-// PUT - Actualizar proveedor
-// ============================================
-export async function PUT(req: Request) {
+// ======================================================
+// PUT — Actualizar proveedor
+// ======================================================
+export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, nombre, telefono, direccion } = body;
+
+    const {
+      id,
+      nombre,
+      telefono,
+      correo,
+      direccion,
+      rfc,
+      banco,
+      numeroCuenta,
+      clabe,
+      bancoDolares,
+      numeroCuentaDolares,
+      clabeDolares,
+    } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -68,16 +105,26 @@ export async function PUT(req: Request) {
       );
     }
 
-    const actualizado = await prisma.proveedor.update({
-      where: { id },
+    const proveedor = await prisma.proveedor.update({
+      where: { id: Number(id) },
       data: {
         nombre,
         telefono: telefono || null,
+        correo: correo || null,
         direccion: direccion || null,
+        rfc: rfc || null,
+
+        banco: banco || null,
+        numeroCuenta: numeroCuenta || null,
+        clabe: clabe || null,
+
+        bancoDolares: bancoDolares || null,
+        numeroCuentaDolares: numeroCuentaDolares || null,
+        clabeDolares: clabeDolares || null,
       },
     });
 
-    return NextResponse.json(actualizado);
+    return NextResponse.json(proveedor);
   } catch (error) {
     console.error("❌ Error PUT proveedores:", error);
     return NextResponse.json(
@@ -87,13 +134,14 @@ export async function PUT(req: Request) {
   }
 }
 
-// ============================================
-// DELETE - Eliminar proveedor
-// ============================================
-export async function DELETE(req: Request) {
+// ======================================================
+// DELETE — Eliminar proveedor
+// /api/proveedores?id=1
+// ======================================================
+export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const id = Number(searchParams.get("id"));
+    const id = searchParams.get("id");
 
     if (!id) {
       return NextResponse.json(
@@ -103,10 +151,10 @@ export async function DELETE(req: Request) {
     }
 
     await prisma.proveedor.delete({
-      where: { id },
+      where: { id: Number(id) },
     });
 
-    return NextResponse.json({ message: "Proveedor eliminado" });
+    return NextResponse.json({ message: "Proveedor eliminado correctamente" });
   } catch (error) {
     console.error("❌ Error DELETE proveedores:", error);
     return NextResponse.json(

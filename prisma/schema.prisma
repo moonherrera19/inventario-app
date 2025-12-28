@@ -46,12 +46,29 @@ model Categoria {
   productos   Producto[]
 }
 
+// ========================================================
+// PROVEEDORES (AMPLIADO PARA EXCEL)
+// ========================================================
+
 model Proveedor {
-  id        Int        @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   nombre    String
   telefono  String?
+  correo    String?
   direccion String?
+  rfc       String?
 
+  // Datos bancarios MXN
+  banco        String?
+  numeroCuenta String?
+  clabe        String?
+
+  // Datos bancarios USD
+  bancoDolares        String?
+  numeroCuentaDolares String?
+  clabeDolares        String?
+
+  // Relaciones
   productos    Producto[]
   compras      Compra[]
   comprasAdmin CompraAdministrativa[]
