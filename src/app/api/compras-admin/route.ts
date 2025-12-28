@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { EstatusCompra } from "@prisma/client";
 import * as XLSX from "xlsx";
 
 // ======================================================
@@ -9,9 +10,11 @@ import * as XLSX from "xlsx";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const estatus = searchParams.get("estatus");
+    const estatusParam = searchParams.get("estatus");
 
-    const where = estatus ? { estatus } : {};
+    const where = estatusParam
+      ? { estatus: estatusParam as EstatusCompra }
+      : {};
 
     const compras = await prisma.compraAdministrativa.findMany({
       where,
@@ -48,7 +51,7 @@ export async function POST(req: NextRequest) {
     // ----------------------------------------------
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
-      const file = formData.get("file") as File;
+      const file = formData.get("file") as File | null;
 
       if (!file) {
         return NextResponse.json(
@@ -80,17 +83,17 @@ export async function POST(req: NextRequest) {
           data: {
             proveedorId: proveedor.id,
             numeroFactura: row.FOLIO?.toString(),
-            banco: row.BANCO,
-            cuentaClabe: row["CUENTA/CLABE"],
-            empresa: row.EMPRESA,
+            banco: row.BANCO ?? null,
+            cuentaClabe: row["CUENTA/CLABE"] ?? null,
+            empresa: row.EMPRESA ?? null,
             moneda: row.MONEDA || "MXN",
             concepto: row.PRODUCTO || "SIN CONCEPTO",
-            precio: Number(row.PRECIO) || null,
+            precio: row.PRECIO ? Number(row.PRECIO) : null,
             monto: Number(row.TOTAL),
             fechaFactura: row["FECHA EMISION"]
               ? new Date(row["FECHA EMISION"])
               : null,
-            estatus: "CAPTURADA",
+            estatus: EstatusCompra.CAPTURADA,
           },
         });
 
@@ -112,19 +115,19 @@ export async function POST(req: NextRequest) {
       data: {
         proveedorId: body.proveedorId,
         usuarioId: body.usuarioId || null,
-        numeroFactura: body.numeroFactura,
-        banco: body.banco,
-        cuentaClabe: body.cuentaClabe,
-        empresa: body.empresa,
+        numeroFactura: body.numeroFactura || null,
+        banco: body.banco || null,
+        cuentaClabe: body.cuentaClabe || null,
+        empresa: body.empresa || null,
         moneda: body.moneda || "MXN",
         concepto: body.concepto,
-        precio: body.precio,
-        monto: body.monto,
+        precio: body.precio ?? null,
+        monto: Number(body.monto),
         fechaFactura: body.fechaFactura
           ? new Date(body.fechaFactura)
           : null,
-        estatus: "CAPTURADA",
-        observaciones: body.observaciones,
+        estatus: EstatusCompra.CAPTURADA,
+        observaciones: body.observaciones || null,
       },
     });
 
@@ -155,13 +158,14 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
+    const nuevoEstatus = body.estatus as EstatusCompra;
 
     const compra = await prisma.compraAdministrativa.update({
       where: { id: Number(id) },
       data: {
-        estatus: body.estatus,
+        estatus: nuevoEstatus,
         fechaPago:
-          body.estatus === "PAGADA"
+          nuevoEstatus === EstatusCompra.PAGADA
             ? new Date(body.fechaPago || new Date())
             : null,
       },
