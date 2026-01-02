@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // ======================================================
-// GET - Obtener todos los productos
+// GET - Obtener todos los productos (SEGURO)
 // ======================================================
 export async function GET() {
   try {
@@ -11,19 +11,16 @@ export async function GET() {
       include: {
         categoria: true,
         proveedor: true,
-        entradas: true,
-        salidas: true,
-        compras: true,
       },
     });
 
-    return NextResponse.json(productos);
+    // 🔒 SIEMPRE ARRAY
+    return NextResponse.json(Array.isArray(productos) ? productos : []);
   } catch (error) {
     console.error("❌ Error GET productos:", error);
-    return NextResponse.json(
-      { message: "Error al obtener productos" },
-      { status: 500 }
-    );
+
+    // 🔒 NUNCA devolver objeto si el front espera array
+    return NextResponse.json([]);
   }
 }
 
@@ -42,11 +39,9 @@ export async function POST(req: Request) {
       stockMinimo,
     } = body;
 
-    // Sanitizar
     nombre = nombre?.trim();
     unidad = unidad?.trim();
 
-    // Validaciones
     if (!nombre || !unidad) {
       return NextResponse.json(
         { message: "Nombre y unidad son obligatorios." },
@@ -68,7 +63,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validar que nombre no esté duplicado
     const existe = await prisma.producto.findFirst({
       where: { nombre },
     });
@@ -86,8 +80,14 @@ export async function POST(req: Request) {
         unidad,
         categoriaId: categoriaId || null,
         proveedorId: proveedorId || null,
-        precioUnitario: precioUnitario ? Number(precioUnitario) : null,
-        stockMinimo: stockMinimo ? Number(stockMinimo) : 0,
+        precioUnitario:
+          precioUnitario !== null && precioUnitario !== undefined
+            ? Number(precioUnitario)
+            : null,
+        stockMinimo:
+          stockMinimo !== null && stockMinimo !== undefined
+            ? Number(stockMinimo)
+            : 0,
       },
     });
 
@@ -124,11 +124,9 @@ export async function PUT(req: Request) {
       );
     }
 
-    // Sanitizar
     nombre = nombre?.trim();
     unidad = unidad?.trim();
 
-    // Validaciones
     if (!nombre || !unidad) {
       return NextResponse.json(
         { message: "Nombre y unidad son obligatorios." },
@@ -136,21 +134,6 @@ export async function PUT(req: Request) {
       );
     }
 
-    if (precioUnitario != null && Number(precioUnitario) < 0) {
-      return NextResponse.json(
-        { message: "El precio unitario no puede ser negativo." },
-        { status: 400 }
-      );
-    }
-
-    if (stockMinimo != null && Number(stockMinimo) < 0) {
-      return NextResponse.json(
-        { message: "El stock mínimo debe ser mayor o igual a 0." },
-        { status: 400 }
-      );
-    }
-
-    // Evitar duplicados (si se cambia el nombre)
     const existe = await prisma.producto.findFirst({
       where: {
         nombre,
@@ -172,8 +155,14 @@ export async function PUT(req: Request) {
         unidad,
         categoriaId: categoriaId || null,
         proveedorId: proveedorId || null,
-        precioUnitario: precioUnitario ? Number(precioUnitario) : null,
-        stockMinimo: stockMinimo ? Number(stockMinimo) : 0,
+        precioUnitario:
+          precioUnitario !== null && precioUnitario !== undefined
+            ? Number(precioUnitario)
+            : null,
+        stockMinimo:
+          stockMinimo !== null && stockMinimo !== undefined
+            ? Number(stockMinimo)
+            : 0,
       },
     });
 
@@ -202,10 +191,10 @@ export async function DELETE(req: Request) {
       );
     }
 
-    // Verificar si el producto tiene movimientos
-    const tieneMovimientos = await prisma.entrada.findFirst({ where: { productoId: id } }) ||
-                             await prisma.salida.findFirst({ where: { productoId: id } }) ||
-                             await prisma.compra.findFirst({ where: { productoId: id } });
+    const tieneMovimientos =
+      (await prisma.entrada.findFirst({ where: { productoId: id } })) ||
+      (await prisma.salida.findFirst({ where: { productoId: id } })) ||
+      (await prisma.compra.findFirst({ where: { productoId: id } }));
 
     if (tieneMovimientos) {
       return NextResponse.json(
