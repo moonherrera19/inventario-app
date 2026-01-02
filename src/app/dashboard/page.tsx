@@ -11,7 +11,7 @@ import CategoriasDonut from "@/components/dashboard/charts/CategoriasDonut";
 import ProveedoresBar from "@/components/dashboard/charts/ProveedoresBar";
 import TopProductos from "@/components/dashboard/charts/TopProductos";
 
-// ⭐ Tipo seguro para stats
+// ⭐ Stats por defecto (SEGURO)
 const statsDefault = {
   totalProductos: 0,
   stockBajo: 0,
@@ -21,20 +21,37 @@ const statsDefault = {
 
 export default function Dashboard() {
   const [stats, setStats] = useState(statsDefault);
-  const [categorias, setCategorias] = useState([]);
-  const [proveedores, setProveedores] = useState([]);
-  const [topProductos, setTopProductos] = useState([]);
+  const [categorias, setCategorias] = useState<any[]>([]);
+  const [proveedores, setProveedores] = useState<any[]>([]);
+  const [topProductos, setTopProductos] = useState<any[]>([]);
 
-  // Cargar estadísticas
+  // ==============================
+  // CARGAR DATOS DEL DASHBOARD
+  // ==============================
   useEffect(() => {
-    fetch("/api/dashboard/stats").then((r) => r.json()).then(setStats);
-    fetch("/api/dashboard/charts/categorias").then((r) => r.json()).then(setCategorias);
-    fetch("/api/dashboard/charts/proveedores").then((r) => r.json()).then(setProveedores);
-    fetch("/api/dashboard/charts/topProductos").then((r) => r.json()).then(setTopProductos);
+    fetch("/api/dashboard/stats")
+      .then((r) => r.json())
+      .then((data) => setStats(data || statsDefault))
+      .catch(() => setStats(statsDefault));
+
+    fetch("/api/dashboard/charts/categorias")
+      .then((r) => r.json())
+      .then((data) => setCategorias(Array.isArray(data) ? data : []))
+      .catch(() => setCategorias([]));
+
+    fetch("/api/dashboard/charts/proveedores")
+      .then((r) => r.json())
+      .then((data) => setProveedores(Array.isArray(data) ? data : []))
+      .catch(() => setProveedores([]));
+
+    fetch("/api/dashboard/charts/topProductos")
+      .then((r) => r.json())
+      .then((data) => setTopProductos(Array.isArray(data) ? data : []))
+      .catch(() => setTopProductos([]));
   }, []);
 
   // ==============================
-  // GRAFICA PRINCIPAL YA SIN ENTRADAS/SALIDAS
+  // GRAFICA PRINCIPAL (PLACEHOLDER)
   // ==============================
   const dias = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
   const dataGrafica = dias.map((dia) => ({
@@ -45,35 +62,32 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 text-white">
-
       <h1 className="text-4xl font-bold mb-8">Dashboard Agrícola</h1>
 
       {/* ==========================
           KPI CARDS
       =========================== */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
-
         <KpiCard
           title="Productos Totales"
-          value={stats.totalProductos}
+          value={Number(stats?.totalProductos ?? 0)}
         />
 
         <KpiCard
           title="Stock Bajo"
-          value={stats.stockBajo}
+          value={Number(stats?.stockBajo ?? 0)}
           color="red"
         />
 
         <KpiCard
           title="Valor Total Inventario"
-          value={`$${stats.valorInventario.toFixed(2)}`}
+          value={`$${Number(stats?.valorInventario ?? 0).toFixed(2)}`}
         />
 
         <KpiCard
           title="Gasto en Compras (Mes)"
-          value={`$${stats.comprasMes.toFixed(2)}`}
+          value={`$${Number(stats?.comprasMes ?? 0).toFixed(2)}`}
         />
-
       </div>
 
       {/* GRAFICA PRINCIPAL */}
@@ -87,7 +101,6 @@ export default function Dashboard() {
         <ProveedoresBar data={proveedores} />
         <TopProductos data={topProductos} />
       </div>
-
     </div>
   );
 }
