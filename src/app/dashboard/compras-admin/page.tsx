@@ -16,6 +16,9 @@ type Proveedor = {
 type Compra = {
   id: number;
   numeroFactura?: string;
+  banco?: string;
+  cuentaClabe?: string;
+  empresa?: string;
   concepto: string;
   monto: number;
   estatus: "CAPTURADA" | "APROBADA" | "PAGADA";
@@ -27,17 +30,20 @@ type Compra = {
 export default function ComprasAdminPage() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [compras, setCompras] = useState<Compra[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+
+  const [filtroEmpresa, setFiltroEmpresa] = useState("");
+  const [filtroEstatus, setFiltroEstatus] = useState("");
 
   const [form, setForm] = useState<any>({
     proveedorId: "",
     banco: "",
     cuentaClabe: "",
+    empresa: "",
     moneda: "MXN",
     numeroFactura: "",
     concepto: "",
     monto: "",
-    fechaFactura: "",
   });
 
   // ===============================
@@ -57,34 +63,34 @@ export default function ComprasAdminPage() {
   }, []);
 
   // ===============================
-  // SELECT PROVEEDOR → AUTOFILL
+  // AUTOFILL PROVEEDOR
   // ===============================
   const onSelectProveedor = (id: number) => {
     const prov = proveedores.find(p => p.id === id);
     if (!prov) return;
 
-    if (form.moneda === "USD") {
-      setForm({
-        ...form,
-        proveedorId: id,
-        banco: prov.bancoDolares || "",
-        cuentaClabe: prov.numeroCuentaDolares || prov.clabeDolares || "",
-      });
-    } else {
-      setForm({
-        ...form,
-        proveedorId: id,
-        banco: prov.banco || "",
-        cuentaClabe: prov.numeroCuenta || prov.clabe || "",
-      });
-    }
+    const banco =
+      form.moneda === "USD"
+        ? prov.bancoDolares
+        : prov.banco;
+
+    const cuenta =
+      form.moneda === "USD"
+        ? prov.numeroCuentaDolares || prov.clabeDolares
+        : prov.numeroCuenta || prov.clabe;
+
+    setForm({
+      ...form,
+      proveedorId: id,
+      banco: banco || "",
+      cuentaClabe: cuenta || "",
+    });
   };
 
   // ===============================
   // CREAR COMPRA
   // ===============================
   const guardarCompra = async () => {
-    setLoading(true);
     await fetch("/api/compras-admin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -92,19 +98,39 @@ export default function ComprasAdminPage() {
         ...form,
         proveedorId: Number(form.proveedorId),
         monto: Number(form.monto),
+        fechaFactura: new Date(), // hoy
       }),
     });
-    setLoading(false);
+
     setForm({
       proveedorId: "",
       banco: "",
       cuentaClabe: "",
+      empresa: "",
       moneda: "MXN",
       numeroFactura: "",
       concepto: "",
       monto: "",
-      fechaFactura: "",
     });
+
+    fetchAll();
+  };
+
+  // ===============================
+  // IMPORTAR EXCEL
+  // ===============================
+  const importarExcel = async () => {
+    if (!file) return;
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    await fetch("/api/compras-admin", {
+      method: "POST",
+      body: fd,
+    });
+
+    setFile(null);
     fetchAll();
   };
 
@@ -124,10 +150,18 @@ export default function ComprasAdminPage() {
   };
 
   // ===============================
-  // TOTALES
+  // FILTROS
   // ===============================
+  const comprasFiltradas = compras.filter(c => {
+    if (filtroEmpresa && c.empresa !== filtroEmpresa) return false;
+    if (filtroEstatus && c.estatus !== filtroEstatus) return false;
+    return true;
+  });
+
   const total = (e: string) =>
-    compras.filter(c => c.estatus === e).reduce((s, c) => s + c.monto, 0);
+    comprasFiltradas
+      .filter(c => c.estatus === e)
+      .reduce((s, c) => s + c.monto, 0);
 
   return (
     <div className="min-h-screen p-6 bg-[#0f1217] text-white">
@@ -135,67 +169,75 @@ export default function ComprasAdminPage() {
         Compras Administrativas
       </h1>
 
+      {/* IMPORTAR */}
+      <div className="flex gap-3 mb-6">
+        <input type="file" accept=".xlsx,.xls" onChange={e => setFile(e.target.files?.[0] || null)} />
+        <button onClick={importarExcel} className="bg-green-600 px-4 py-2 rounded">
+          Importar Excel
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* FORMULARIO */}
-        <div className="bg-[#111319] p-5 rounded-xl border border-white/10">
-          <h2 className="font-semibold mb-4">Registrar factura</h2>
+        {/* FORM */}
+        <div className="bg-[#111319] p-5 rounded-xl">
+          <h2 className="mb-4 font-semibold">Registrar factura</h2>
 
-          <select
-            className="w-full mb-2 p-2 bg-black rounded"
+          <select className="w-full mb-2 p-2 bg-black rounded"
             value={form.proveedorId}
-            onChange={(e) => onSelectProveedor(Number(e.target.value))}
+            onChange={e => onSelectProveedor(Number(e.target.value))}
           >
-            <option value="">Selecciona proveedor</option>
+            <option value="">Proveedor</option>
             {proveedores.map(p => (
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </select>
 
-          <select
-            className="w-full mb-2 p-2 bg-black rounded"
-            value={form.moneda}
-            onChange={(e) => setForm({ ...form, moneda: e.target.value })}
-          >
-            <option value="MXN">MXN</option>
-            <option value="USD">USD</option>
-          </select>
-
           <input disabled value={form.banco} className="w-full mb-2 p-2 bg-black rounded" />
           <input disabled value={form.cuentaClabe} className="w-full mb-2 p-2 bg-black rounded" />
 
+          <input placeholder="Empresa" className="w-full mb-2 p-2 bg-black rounded"
+            value={form.empresa}
+            onChange={e => setForm({ ...form, empresa: e.target.value })}
+          />
+
           <input placeholder="Folio" className="w-full mb-2 p-2 bg-black rounded"
             value={form.numeroFactura}
-            onChange={(e) => setForm({ ...form, numeroFactura: e.target.value })}
+            onChange={e => setForm({ ...form, numeroFactura: e.target.value })}
           />
 
           <input placeholder="Concepto" className="w-full mb-2 p-2 bg-black rounded"
             value={form.concepto}
-            onChange={(e) => setForm({ ...form, concepto: e.target.value })}
+            onChange={e => setForm({ ...form, concepto: e.target.value })}
           />
 
-          <input placeholder="Total" className="w-full mb-2 p-2 bg-black rounded"
+          <input placeholder="Total" className="w-full mb-4 p-2 bg-black rounded"
             value={form.monto}
-            onChange={(e) => setForm({ ...form, monto: e.target.value })}
+            onChange={e => setForm({ ...form, monto: e.target.value })}
           />
 
-          <input type="date" className="w-full mb-3 p-2 bg-black rounded"
-            value={form.fechaFactura}
-            onChange={(e) => setForm({ ...form, fechaFactura: e.target.value })}
-          />
-
-          <button
-            onClick={guardarCompra}
-            disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 py-2 rounded"
-          >
+          <button onClick={guardarCompra} className="w-full bg-blue-600 py-2 rounded">
             Guardar factura
           </button>
         </div>
 
         {/* TABLA */}
-        <div className="lg:col-span-2 bg-[#111319] p-5 rounded-xl border border-white/10">
-          <h2 className="font-semibold mb-3">Facturas</h2>
+        <div className="lg:col-span-2 bg-[#111319] p-5 rounded-xl">
+          <div className="flex gap-3 mb-3">
+            <select onChange={e => setFiltroEmpresa(e.target.value)} className="bg-black p-2 rounded">
+              <option value="">Todas las empresas</option>
+              {[...new Set(compras.map(c => c.empresa))].map(e => (
+                <option key={e} value={e}>{e}</option>
+              ))}
+            </select>
+
+            <select onChange={e => setFiltroEstatus(e.target.value)} className="bg-black p-2 rounded">
+              <option value="">Todos</option>
+              <option value="CAPTURADA">CAPTURADA</option>
+              <option value="APROBADA">APROBADA</option>
+              <option value="PAGADA">PAGADA</option>
+            </select>
+          </div>
 
           <div className="overflow-auto max-h-[420px]">
             <table className="w-full text-sm">
@@ -209,7 +251,7 @@ export default function ComprasAdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {compras.map(c => (
+                {comprasFiltradas.map(c => (
                   <tr key={c.id} className="border-t border-white/10">
                     <td>{c.proveedor.nombre}</td>
                     <td>{c.numeroFactura}</td>
