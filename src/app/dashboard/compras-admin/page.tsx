@@ -33,6 +33,20 @@ export default function ComprasAdminPage() {
   const [hasta, setHasta] = useState("");
 
   // ===============================
+  // REGISTRAR FACTURA
+  // ===============================
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [tipoBanco, setTipoBanco] = useState<"MX" | "USA">("MX");
+  const [proveedores, setProveedores] = useState<any[]>([]);
+  const [formFactura, setFormFactura] = useState({
+    proveedorId: "",
+    empresa: "",
+    folio: "",
+    concepto: "",
+    total: "",
+  });
+
+  // ===============================
   // CARGAR COMPRAS
   // ===============================
   const fetchCompras = async () => {
@@ -44,6 +58,21 @@ export default function ComprasAdminPage() {
   useEffect(() => {
     fetchCompras();
   }, []);
+
+  // ===============================
+  // CARGAR PROVEEDORES POR BANCO
+  // ===============================
+  useEffect(() => {
+    if (!mostrarFormulario) return;
+
+    const fetchProveedores = async () => {
+      const res = await fetch(`/api/proveedores?banco=${tipoBanco}`);
+      const data = await res.json();
+      setProveedores(data || []);
+    };
+
+    fetchProveedores();
+  }, [tipoBanco, mostrarFormulario]);
 
   // ===============================
   // FILTRADO CENTRAL
@@ -100,7 +129,6 @@ export default function ComprasAdminPage() {
     }
 
     const doc = new jsPDF();
-
     doc.setFontSize(14);
     doc.text(`Reporte de Compras - ${empresa}`, 14, 15);
 
@@ -127,9 +155,7 @@ export default function ComprasAdminPage() {
         Compras Administrativas
       </h1>
 
-      {/* ======================= */}
       {/* FILTROS */}
-      {/* ======================= */}
       <div className="bg-[#111319] p-4 rounded-xl border border-white/10 mb-4">
         <h2 className="font-semibold mb-3 text-green-300">Filtros</h2>
 
@@ -150,21 +176,20 @@ export default function ComprasAdminPage() {
         </div>
       </div>
 
-      {/* ======================= */}
-      {/* BOTONES EXPORTACIÓN */}
-      {/* ======================= */}
+      {/* BOTONES */}
       <div className="flex gap-3 mb-6">
-        <button onClick={exportarExcel} className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-semibold">
+        <button onClick={exportarExcel} className="bg-green-600 px-4 py-2 rounded font-semibold">
           Exportar Excel
         </button>
-        <button onClick={exportarPDF} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-semibold">
+        <button onClick={exportarPDF} className="bg-red-600 px-4 py-2 rounded font-semibold">
           Exportar PDF por empresa
+        </button>
+        <button onClick={() => setMostrarFormulario(true)} className="bg-blue-600 px-4 py-2 rounded font-semibold">
+          Registrar factura
         </button>
       </div>
 
-      {/* ======================= */}
       {/* TOTALES */}
-      {/* ======================= */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-[#111319] p-4 rounded border border-yellow-600">
           <p className="text-yellow-400">Capturadas</p>
@@ -180,9 +205,7 @@ export default function ComprasAdminPage() {
         </div>
       </div>
 
-      {/* ======================= */}
       {/* TABLA */}
-      {/* ======================= */}
       <div className="bg-[#111319] p-4 rounded-xl border border-white/10">
         <h2 className="font-semibold mb-3">Facturas</h2>
 
@@ -209,7 +232,6 @@ export default function ComprasAdminPage() {
                   <td>{c.estatus}</td>
                 </tr>
               ))}
-
               {comprasFiltradas.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center py-4 text-gray-400">
@@ -221,6 +243,60 @@ export default function ComprasAdminPage() {
           </table>
         </div>
       </div>
+
+      {/* MODAL REGISTRAR FACTURA */}
+      {mostrarFormulario && (
+        <div className="fixed inset-0 bg-black/70 flex justify-end z-50">
+          <div className="w-full max-w-md bg-[#111319] p-6 overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4">Registrar factura</h2>
+
+            <select className="bg-black p-2 rounded w-full mb-3" value={tipoBanco} onChange={e => setTipoBanco(e.target.value as any)}>
+              <option value="MX">Banco MX</option>
+              <option value="USA">Banco USA</option>
+            </select>
+
+            <select className="bg-black p-2 rounded w-full mb-3" value={formFactura.proveedorId}
+              onChange={e => setFormFactura({ ...formFactura, proveedorId: e.target.value })}>
+              <option value="">Proveedor</option>
+              {proveedores.map(p => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+
+            <select className="bg-black p-2 rounded w-full mb-3" value={formFactura.empresa}
+              onChange={e => setFormFactura({ ...formFactura, empresa: e.target.value })}>
+              <option value="">Empresa</option>
+              {EMPRESAS.map(e => <option key={e} value={e}>{e}</option>)}
+            </select>
+
+            <input className="bg-black p-2 rounded w-full mb-3" placeholder="Folio"
+              value={formFactura.folio} onChange={e => setFormFactura({ ...formFactura, folio: e.target.value })} />
+
+            <input className="bg-black p-2 rounded w-full mb-3" placeholder="Concepto"
+              value={formFactura.concepto} onChange={e => setFormFactura({ ...formFactura, concepto: e.target.value })} />
+
+            <input type="number" className="bg-black p-2 rounded w-full mb-4" placeholder="Total"
+              value={formFactura.total} onChange={e => setFormFactura({ ...formFactura, total: e.target.value })} />
+
+            <button className="bg-blue-600 w-full py-2 rounded font-semibold"
+              onClick={async () => {
+                await fetch("/api/compras-admin", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ...formFactura, banco: tipoBanco }),
+                });
+                setMostrarFormulario(false);
+                fetchCompras();
+              }}>
+              Guardar factura
+            </button>
+
+            <button className="text-gray-400 mt-4 w-full" onClick={() => setMostrarFormulario(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
