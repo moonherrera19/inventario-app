@@ -2,56 +2,88 @@
 
 import { useEffect, useState } from "react";
 
+type Proveedor = {
+  id: number;
+  nombre: string;
+  banco?: string;
+  numeroCuenta?: string;
+  clabe?: string;
+  bancoDolares?: string;
+  numeroCuentaDolares?: string;
+  clabeDolares?: string;
+};
+
 type Compra = {
   id: number;
   numeroFactura?: string;
-  banco?: string;
-  empresa?: string;
   concepto: string;
   monto: number;
   estatus: "CAPTURADA" | "APROBADA" | "PAGADA";
   fechaFactura?: string;
   fechaPago?: string;
-  proveedor: {
-    nombre: string;
-  };
+  proveedor: { nombre: string };
 };
 
 export default function ComprasAdminPage() {
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [compras, setCompras] = useState<Compra[]>([]);
-  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState<any>({
     proveedorId: "",
-    numeroFactura: "",
     banco: "",
     cuentaClabe: "",
-    empresa: "",
     moneda: "MXN",
+    numeroFactura: "",
     concepto: "",
-    precio: "",
     monto: "",
     fechaFactura: "",
   });
 
   // ===============================
-  // Cargar compras
+  // CARGAR DATOS
   // ===============================
-  const fetchCompras = async () => {
-    const res = await fetch("/api/compras-admin");
-    const data = await res.json();
-    setCompras(data.compras);
+  const fetchAll = async () => {
+    const [p, c] = await Promise.all([
+      fetch("/api/proveedores").then(r => r.json()),
+      fetch("/api/compras-admin").then(r => r.json()),
+    ]);
+    setProveedores(p);
+    setCompras(c.compras);
   };
 
   useEffect(() => {
-    fetchCompras();
+    fetchAll();
   }, []);
 
   // ===============================
-  // Crear compra manual
+  // SELECT PROVEEDOR → AUTOFILL
   // ===============================
-  const submitForm = async () => {
+  const onSelectProveedor = (id: number) => {
+    const prov = proveedores.find(p => p.id === id);
+    if (!prov) return;
+
+    if (form.moneda === "USD") {
+      setForm({
+        ...form,
+        proveedorId: id,
+        banco: prov.bancoDolares || "",
+        cuentaClabe: prov.numeroCuentaDolares || prov.clabeDolares || "",
+      });
+    } else {
+      setForm({
+        ...form,
+        proveedorId: id,
+        banco: prov.banco || "",
+        cuentaClabe: prov.numeroCuenta || prov.clabe || "",
+      });
+    }
+  };
+
+  // ===============================
+  // CREAR COMPRA
+  // ===============================
+  const guardarCompra = async () => {
     setLoading(true);
     await fetch("/api/compras-admin", {
       method: "POST",
@@ -60,190 +92,147 @@ export default function ComprasAdminPage() {
         ...form,
         proveedorId: Number(form.proveedorId),
         monto: Number(form.monto),
-        precio: form.precio ? Number(form.precio) : null,
       }),
     });
     setLoading(false);
     setForm({
       proveedorId: "",
-      numeroFactura: "",
       banco: "",
       cuentaClabe: "",
-      empresa: "",
       moneda: "MXN",
+      numeroFactura: "",
       concepto: "",
-      precio: "",
       monto: "",
       fechaFactura: "",
     });
-    fetchCompras();
+    fetchAll();
   };
 
   // ===============================
-  // Importar Excel
+  // CAMBIAR ESTATUS
   // ===============================
-  const importExcel = async () => {
-    if (!file) return;
-    setLoading(true);
-    const fd = new FormData();
-    fd.append("file", file);
-
-    await fetch("/api/compras-admin", {
-      method: "POST",
-      body: fd,
-    });
-
-    setFile(null);
-    setLoading(false);
-    fetchCompras();
-  };
-
-  // ===============================
-  // Cambiar estatus
-  // ===============================
-  const changeStatus = async (id: number, estatus: string) => {
+  const cambiarEstatus = async (id: number, estatus: string) => {
     await fetch(`/api/compras-admin?id=${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estatus }),
+      body: JSON.stringify({
+        estatus,
+        fechaPago: estatus === "PAGADA" ? new Date() : null,
+      }),
     });
-    fetchCompras();
+    fetchAll();
   };
 
   // ===============================
-  // Totales
+  // TOTALES
   // ===============================
-  const totalByStatus = (estatus: string) =>
-    compras
-      .filter((c) => c.estatus === estatus)
-      .reduce((sum, c) => sum + c.monto, 0);
+  const total = (e: string) =>
+    compras.filter(c => c.estatus === e).reduce((s, c) => s + c.monto, 0);
 
   return (
-    <div className="p-6 text-white bg-[#0f1217] min-h-screen">
-      <h1 className="text-2xl font-bold mb-6">Compras Administrativas</h1>
+    <div className="min-h-screen p-6 bg-[#0f1217] text-white">
+      <h1 className="text-3xl font-bold text-green-400 mb-6">
+        Compras Administrativas
+      </h1>
 
-      {/* IMPORTAR EXCEL */}
-      <div className="mb-6 flex items-center gap-3">
-        <input
-          type="file"
-          accept=".xlsx,.xls"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-        />
-        <button
-          onClick={importExcel}
-          className="px-4 py-2 bg-green-600 rounded"
-        >
-          Importar Excel
-        </button>
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* FORMULARIO */}
-        <div className="bg-[#111319] p-4 rounded">
-          <h2 className="font-semibold mb-3">Registrar factura</h2>
+        <div className="bg-[#111319] p-5 rounded-xl border border-white/10">
+          <h2 className="font-semibold mb-4">Registrar factura</h2>
 
-          {[
-            ["Proveedor ID", "proveedorId"],
-            ["Folio", "numeroFactura"],
-            ["Banco", "banco"],
-            ["Cuenta / Clabe", "cuentaClabe"],
-            ["Empresa", "empresa"],
-            ["Concepto", "concepto"],
-            ["Precio", "precio"],
-            ["Total", "monto"],
-          ].map(([label, key]) => (
-            <input
-              key={key}
-              placeholder={label}
-              className="w-full mb-2 p-2 bg-black border border-white/10 rounded"
-              value={form[key]}
-              onChange={(e) =>
-                setForm({ ...form, [key]: e.target.value })
-              }
-            />
-          ))}
+          <select
+            className="w-full mb-2 p-2 bg-black rounded"
+            value={form.proveedorId}
+            onChange={(e) => onSelectProveedor(Number(e.target.value))}
+          >
+            <option value="">Selecciona proveedor</option>
+            {proveedores.map(p => (
+              <option key={p.id} value={p.id}>{p.nombre}</option>
+            ))}
+          </select>
 
-          <input
-            type="date"
-            className="w-full mb-2 p-2 bg-black border border-white/10 rounded"
+          <select
+            className="w-full mb-2 p-2 bg-black rounded"
+            value={form.moneda}
+            onChange={(e) => setForm({ ...form, moneda: e.target.value })}
+          >
+            <option value="MXN">MXN</option>
+            <option value="USD">USD</option>
+          </select>
+
+          <input disabled value={form.banco} className="w-full mb-2 p-2 bg-black rounded" />
+          <input disabled value={form.cuentaClabe} className="w-full mb-2 p-2 bg-black rounded" />
+
+          <input placeholder="Folio" className="w-full mb-2 p-2 bg-black rounded"
+            value={form.numeroFactura}
+            onChange={(e) => setForm({ ...form, numeroFactura: e.target.value })}
+          />
+
+          <input placeholder="Concepto" className="w-full mb-2 p-2 bg-black rounded"
+            value={form.concepto}
+            onChange={(e) => setForm({ ...form, concepto: e.target.value })}
+          />
+
+          <input placeholder="Total" className="w-full mb-2 p-2 bg-black rounded"
+            value={form.monto}
+            onChange={(e) => setForm({ ...form, monto: e.target.value })}
+          />
+
+          <input type="date" className="w-full mb-3 p-2 bg-black rounded"
             value={form.fechaFactura}
-            onChange={(e) =>
-              setForm({ ...form, fechaFactura: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, fechaFactura: e.target.value })}
           />
 
           <button
-            onClick={submitForm}
+            onClick={guardarCompra}
             disabled={loading}
-            className="w-full bg-blue-600 py-2 rounded mt-2"
+            className="w-full bg-green-600 hover:bg-green-700 py-2 rounded"
           >
             Guardar factura
           </button>
         </div>
 
         {/* TABLA */}
-        <div className="md:col-span-2 bg-[#111319] p-4 rounded">
+        <div className="lg:col-span-2 bg-[#111319] p-5 rounded-xl border border-white/10">
           <h2 className="font-semibold mb-3">Facturas</h2>
 
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-400">
-                <th>Folio</th>
-                <th>Proveedor</th>
-                <th>Total</th>
-                <th>Estatus</th>
-                <th>Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {compras.map((c) => (
-                <tr key={c.id} className="border-t border-white/10">
-                  <td>{c.numeroFactura}</td>
-                  <td>{c.proveedor?.nombre}</td>
-                  <td>${c.monto.toFixed(2)}</td>
-                  <td>
-                    <span
-                      className={`px-2 py-1 rounded text-xs ${
-                        c.estatus === "CAPTURADA"
-                          ? "bg-yellow-600"
-                          : c.estatus === "APROBADA"
-                          ? "bg-blue-600"
-                          : "bg-green-600"
-                      }`}
-                    >
-                      {c.estatus}
-                    </span>
-                  </td>
-                  <td className="flex gap-1 py-1">
-                    {c.estatus !== "APROBADA" && (
-                      <button
-                        onClick={() => changeStatus(c.id, "APROBADA")}
-                        className="text-blue-400"
-                      >
-                        Aprobar
-                      </button>
-                    )}
-                    {c.estatus !== "PAGADA" && (
-                      <button
-                        onClick={() => changeStatus(c.id, "PAGADA")}
-                        className="text-green-400"
-                      >
-                        Pagar
-                      </button>
-                    )}
-                  </td>
+          <div className="overflow-auto max-h-[420px]">
+            <table className="w-full text-sm">
+              <thead className="text-green-300">
+                <tr>
+                  <th>Proveedor</th>
+                  <th>Folio</th>
+                  <th>Total</th>
+                  <th>Estatus</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              </thead>
+              <tbody>
+                {compras.map(c => (
+                  <tr key={c.id} className="border-t border-white/10">
+                    <td>{c.proveedor.nombre}</td>
+                    <td>{c.numeroFactura}</td>
+                    <td>${c.monto.toFixed(2)}</td>
+                    <td>{c.estatus}</td>
+                    <td className="flex gap-2">
+                      {c.estatus !== "APROBADA" &&
+                        <button onClick={() => cambiarEstatus(c.id, "APROBADA")} className="text-blue-400">Aprobar</button>}
+                      {c.estatus !== "PAGADA" &&
+                        <button onClick={() => cambiarEstatus(c.id, "PAGADA")} className="text-green-400">Pagar</button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      {/* TOTALES */}
-      <div className="mt-6 flex gap-6">
-        <div>Capturado: ${totalByStatus("CAPTURADA").toFixed(2)}</div>
-        <div>Aprobado: ${totalByStatus("APROBADA").toFixed(2)}</div>
-        <div>Pagado: ${totalByStatus("PAGADA").toFixed(2)}</div>
+          <div className="mt-4 flex gap-6 text-sm">
+            <div>Capturado: ${total("CAPTURADA").toFixed(2)}</div>
+            <div>Aprobado: ${total("APROBADA").toFixed(2)}</div>
+            <div>Pagado: ${total("PAGADA").toFixed(2)}</div>
+          </div>
+        </div>
       </div>
     </div>
   );
