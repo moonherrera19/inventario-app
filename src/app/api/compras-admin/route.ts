@@ -5,7 +5,6 @@ import * as XLSX from "xlsx";
 
 // ======================================================
 // GET → listar compras + filtros + totales
-// /api/compras-admin?estatus=CAPTURADA
 // ======================================================
 export async function GET(req: NextRequest) {
   try {
@@ -18,9 +17,7 @@ export async function GET(req: NextRequest) {
 
     const compras = await prisma.compraAdministrativa.findMany({
       where,
-      include: {
-        proveedor: true,
-      },
+      include: { proveedor: true },
       orderBy: { creadoEn: "desc" },
     });
 
@@ -46,18 +43,15 @@ export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get("content-type") || "";
 
-    // ----------------------------------------------
-    // 🔹 IMPORTAR EXCEL
-    // ----------------------------------------------
+    // ==================================================
+    // 🔹 IMPORTAR EXCEL (FORMATO HUMANO)
+    // ==================================================
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
       const file = formData.get("file") as File | null;
 
       if (!file) {
-        return NextResponse.json(
-          { error: "Archivo no encontrado" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "Archivo no encontrado" }, { status: 400 });
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
@@ -66,34 +60,70 @@ export async function POST(req: NextRequest) {
       const rows = XLSX.utils.sheet_to_json<any>(sheet);
 
       let inserted = 0;
+      let skipped = 0;
 
       for (const row of rows) {
+        const proveedorNombre = row.PROVEEDOR || row.PROVEDOR;
+        if (!proveedorNombre || !row.TOTAL || !row.FOLIO) {
+          skipped++;
+          continue;
+        }
+
         const proveedor = await prisma.proveedor.findFirst({
           where: {
             nombre: {
-              equals: row.PROVEEDOR || row.PROVEDOR,
+              equals: proveedorNombre.toString().trim(),
               mode: "insensitive",
             },
           },
         });
 
-        if (!proveedor) continue;
+        if (!proveedor) {
+          skipped++;
+          continue;
+        }
+
+        // 💲 limpiar montos ($ ,)
+        const monto = Number(
+          row.TOTAL.toString().replace(/[$,]/g, "")
+        );
+
+        const precio = row.PRECIO
+          ? Number(row.PRECIO.toString().replace(/[$,]/g, ""))
+          : null;
+
+        // 📅 fechas
+        const fechaFactura = row["FECHA EMISION"]
+          ? new Date(row["FECHA EMISION"])
+          : null;
+
+        const fechaPago = row["FECHA DEL PAGO"]
+          ? new Date(row["FECHA DEL PAGO"])
+          : null;
+
+        // 🧾 estatus
+        const estatusExcel = row.ESTATUS?.toString().toUpperCase();
+        const estatus: EstatusCompra =
+          estatusExcel === "PAGADA"
+            ? EstatusCompra.PAGADA
+            : estatusExcel === "APROBADA"
+            ? EstatusCompra.APROBADA
+            : EstatusCompra.CAPTURADA;
 
         await prisma.compraAdministrativa.create({
           data: {
             proveedorId: proveedor.id,
-            numeroFactura: row.FOLIO?.toString(),
-            banco: row.BANCO ?? null,
-            cuentaClabe: row["CUENTA/CLABE"] ?? null,
-            empresa: row.EMPRESA ?? null,
+            numeroFactura: row.FOLIO.toString(),
+            banco: row.BANCO || null,
+            cuentaClabe: row["CUENTA/CLABE"] || null,
+            empresa: row.EMPRESA || null,
             moneda: row.MONEDA || "MXN",
             concepto: row.PRODUCTO || "SIN CONCEPTO",
-            precio: row.PRECIO ? Number(row.PRECIO) : null,
-            monto: Number(row.TOTAL),
-            fechaFactura: row["FECHA EMISION"]
-              ? new Date(row["FECHA EMISION"])
-              : null,
-            estatus: EstatusCompra.CAPTURADA,
+            precio,
+            monto,
+            fechaFactura,
+            fechaPago: estatus === EstatusCompra.PAGADA ? fechaPago : null,
+            estatus,
           },
         });
 
@@ -103,12 +133,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         message: "Importación completada",
         registrosInsertados: inserted,
+        registrosIgnorados: skipped,
       });
     }
 
-    // ----------------------------------------------
+    // ==================================================
     // 🔹 CREAR FACTURA MANUAL
-    // ----------------------------------------------
+    // ==================================================
     const body = await req.json();
 
     const compra = await prisma.compraAdministrativa.create({
@@ -142,8 +173,7 @@ export async function POST(req: NextRequest) {
 }
 
 // ======================================================
-// PATCH → cambiar estatus (APROBAR / PAGAR)
-// /api/compras-admin?id=1
+// PATCH → cambiar estatus
 // ======================================================
 export async function PATCH(req: NextRequest) {
   try {
@@ -151,10 +181,7 @@ export async function PATCH(req: NextRequest) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
-        { error: "ID requerido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
     const body = await req.json();
