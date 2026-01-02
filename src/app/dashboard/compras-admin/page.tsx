@@ -116,6 +116,36 @@ export default function ComprasAdminPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Compras");
     XLSX.writeFile(wb, "reporte_compras.xlsx");
+    const manejarCargaMasiva = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const data = await file.arrayBuffer();
+  const workbook = XLSX.read(data);
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+
+  // Espera columnas:
+  // proveedorId | empresa | folio | concepto | total | banco
+  for (const row of rows) {
+    await fetch("/api/compras-admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        proveedorId: row.proveedorId,
+        empresa: row.empresa,
+        folio: row.folio,
+        concepto: row.concepto,
+        total: row.total,
+        banco: row.banco || tipoBanco,
+      }),
+    });
+  }
+
+  fetchCompras();
+  alert("Carga masiva completada");
+};
+
   };
 
   // ===============================
@@ -189,6 +219,15 @@ export default function ComprasAdminPage() {
         <button onClick={() => setMostrarFormulario(true)} className="bg-blue-600 px-4 py-2 rounded font-semibold">
           Registrar factura
         </button>
+        <label className="bg-purple-600 px-4 py-2 rounded font-semibold cursor-pointer">
+  Carga masiva (Excel)
+  <input
+    type="file"
+    accept=".xlsx,.xls"
+    className="hidden"
+    onChange={e => manejarCargaMasiva(e)}
+  />
+</label>
       </div>
 
       {/* TOTALES */}
@@ -271,13 +310,24 @@ export default function ComprasAdminPage() {
             </select>
 
             {proveedorSeleccionado && (
-              <div className="bg-black/40 p-3 rounded mb-3 text-sm">
-                <p className="text-gray-400">Banco</p>
-                <p className="font-semibold">{proveedorSeleccionado.banco}</p>
-                <p className="text-gray-400 mt-2">Cuenta / CLABE</p>
-                <p className="font-semibold">{proveedorSeleccionado.cuenta}</p>
-              </div>
-            )}
+  <div className="bg-black/40 p-3 rounded mb-3 text-sm space-y-2">
+    <div>
+      <p className="text-gray-400">Banco</p>
+      <p className="font-semibold">{proveedorSeleccionado.banco}</p>
+    </div>
+
+    <div>
+      <p className="text-gray-400">Clave banco</p>
+      <p className="font-semibold">{proveedorSeleccionado.claveBanco}</p>
+    </div>
+
+    <div>
+      <p className="text-gray-400">Cuenta / CLABE</p>
+      <p className="font-semibold">{proveedorSeleccionado.cuenta}</p>
+    </div>
+  </div>
+)}
+
 
             <select className="bg-black p-2 rounded w-full mb-3"
               value={formFactura.empresa}
