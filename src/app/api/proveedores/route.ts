@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// helper seguro: todo a string o null
+const toStringOrNull = (v: any) =>
+  v !== undefined && v !== null && String(v).trim() !== ""
+    ? String(v).trim()
+    : null;
+
 // ======================================================
 // GET — Obtener todos los proveedores
 // ======================================================
@@ -21,7 +27,7 @@ export async function GET() {
 }
 
 // ======================================================
-// POST — Crear proveedor (manual / formulario)
+// POST — Crear proveedor (manual / Excel)
 // ======================================================
 export async function POST(req: NextRequest) {
   try {
@@ -41,7 +47,7 @@ export async function POST(req: NextRequest) {
       clabeDolares,
     } = body;
 
-    if (!nombre || nombre.trim() === "") {
+    if (!nombre || String(nombre).trim() === "") {
       return NextResponse.json(
         { message: "El nombre del proveedor es obligatorio" },
         { status: 400 }
@@ -50,19 +56,20 @@ export async function POST(req: NextRequest) {
 
     const proveedor = await prisma.proveedor.create({
       data: {
-        nombre: nombre.trim(),
-        telefono: telefono || null,
-        correo: correo || null,
-        direccion: direccion || null,
-        rfc: rfc || null,
+        nombre: String(nombre).trim(),
 
-        banco: banco || null,
-        numeroCuenta: numeroCuenta || null,
-        clabe: clabe || null,
+        telefono: toStringOrNull(telefono),
+        correo: toStringOrNull(correo),
+        direccion: toStringOrNull(direccion),
+        rfc: toStringOrNull(rfc),
 
-        bancoDolares: bancoDolares || null,
-        numeroCuentaDolares: numeroCuentaDolares || null,
-        clabeDolares: clabeDolares || null,
+        banco: toStringOrNull(banco),
+        numeroCuenta: toStringOrNull(numeroCuenta),
+        clabe: toStringOrNull(clabe),
+
+        bancoDolares: toStringOrNull(bancoDolares),
+        numeroCuentaDolares: toStringOrNull(numeroCuentaDolares),
+        clabeDolares: toStringOrNull(clabeDolares),
       },
     });
 
@@ -108,19 +115,20 @@ export async function PUT(req: NextRequest) {
     const proveedor = await prisma.proveedor.update({
       where: { id: Number(id) },
       data: {
-        nombre,
-        telefono: telefono || null,
-        correo: correo || null,
-        direccion: direccion || null,
-        rfc: rfc || null,
+        nombre: nombre ? String(nombre).trim() : undefined,
 
-        banco: banco || null,
-        numeroCuenta: numeroCuenta || null,
-        clabe: clabe || null,
+        telefono: toStringOrNull(telefono),
+        correo: toStringOrNull(correo),
+        direccion: toStringOrNull(direccion),
+        rfc: toStringOrNull(rfc),
 
-        bancoDolares: bancoDolares || null,
-        numeroCuentaDolares: numeroCuentaDolares || null,
-        clabeDolares: clabeDolares || null,
+        banco: toStringOrNull(banco),
+        numeroCuenta: toStringOrNull(numeroCuenta),
+        clabe: toStringOrNull(clabe),
+
+        bancoDolares: toStringOrNull(bancoDolares),
+        numeroCuentaDolares: toStringOrNull(numeroCuentaDolares),
+        clabeDolares: toStringOrNull(clabeDolares),
       },
     });
 
@@ -136,7 +144,6 @@ export async function PUT(req: NextRequest) {
 
 // ======================================================
 // DELETE — Eliminar proveedor
-// /api/proveedores?id=1
 // ======================================================
 export async function DELETE(req: NextRequest) {
   try {
