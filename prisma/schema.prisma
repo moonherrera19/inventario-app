@@ -50,25 +50,31 @@ model Proveedor {
 }
 
 model Producto {
-  id              Int              @id @default(autoincrement())
-  nombre          String
-  unidad          String
-  stock           Float            @default(0)
-  creadoEn        DateTime         @default(now())
-  categoriaId     Int?
-  actualizadoEn   DateTime         @updatedAt
-  precioUnitario  Float?
-  proveedorId     Int?
-  stockMinimo     Float            @default(0)
+  id             Int      @id @default(autoincrement())
+  nombre         String
+  unidad         String
+  stock          Float    @default(0)
+  stockMinimo    Float    @default(0)
+  precioUnitario Float?
+  categoriaId    Int?
+  proveedorId    Int?
+
+  manejaLotes    Boolean  @default(false) // 👈 AGREGA ESTA LÍNEA
+
+  creadoEn       DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
+
   compras         Compra[]
   consumos        Consumo[]
   entradas        Entrada[]
   ingredientes    Ingrediente[]
   inventarioLotes InventarioLote[]
-  categoria       Categoria?       @relation(fields: [categoriaId], references: [id])
-  proveedor       Proveedor?       @relation(fields: [proveedorId], references: [id])
   salidas         Salida[]
+
+  categoria Categoria? @relation(fields: [categoriaId], references: [id])
+  proveedor Proveedor? @relation(fields: [proveedorId], references: [id])
 }
+
 
 model InventarioLote {
   id                 Int       @id @default(autoincrement())
