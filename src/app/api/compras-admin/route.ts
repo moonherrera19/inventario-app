@@ -51,83 +51,106 @@ export async function POST(req: NextRequest) {
       const file = formData.get("file") as File | null;
 
       if (!file) {
-        return NextResponse.json({ error: "Archivo no encontrado" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Archivo no encontrado" },
+          { status: 400 }
+        );
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
       const workbook = XLSX.read(buffer);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(sheet);
+
+      // 🔑 CLAVE: raw:false
+      const rows = XLSX.utils.sheet_to_json<any>(sheet, { raw: false });
 
       let inserted = 0;
       let skipped = 0;
 
       for (const row of rows) {
-        const proveedorNombre = row.PROVEEDOR || row.PROVEDOR;
-        if (!proveedorNombre || !row.TOTAL || !row.FOLIO) {
-          skipped++;
-          continue;
-        }
+        try {
+          const proveedorNombre = row.PROVEEDOR || row.PROVEDOR;
+          if (!proveedorNombre || !row.FOLIO || !row.TOTAL) {
+            skipped++;
+            continue;
+          }
 
-        const proveedor = await prisma.proveedor.findFirst({
-          where: {
-            nombre: {
-              equals: proveedorNombre.toString().trim(),
-              mode: "insensitive",
+          const proveedor = await prisma.proveedor.findFirst({
+            where: {
+              nombre: {
+                equals: proveedorNombre.toString().trim(),
+                mode: "insensitive",
+              },
             },
-          },
-        });
+          });
 
-        if (!proveedor) {
+          if (!proveedor) {
+            skipped++;
+            continue;
+          }
+
+          // 💲 Montos
+          const monto = Number(
+            row.TOTAL.toString().replace(/[$,]/g, "")
+          );
+
+          const precio = row.PRECIO
+            ? Number(row.PRECIO.toString().replace(/[$,]/g, ""))
+            : null;
+
+          // 📅 FECHA EMISIÓN
+          let fechaFactura: Date | null = null;
+          if (row["FECHA EMISION"]) {
+            const parsed = XLSX.SSF.parse_date_code(
+              Number(row["FECHA EMISION"])
+            );
+            if (parsed) {
+              fechaFactura = new Date(parsed.y, parsed.m - 1, parsed.d);
+            }
+          }
+
+          // 📅 FECHA PAGO
+          let fechaPago: Date | null = null;
+          if (row["FECHA DEL PAGO"]) {
+            const parsed = XLSX.SSF.parse_date_code(
+              Number(row["FECHA DEL PAGO"])
+            );
+            if (parsed) {
+              fechaPago = new Date(parsed.y, parsed.m - 1, parsed.d);
+            }
+          }
+
+          // 🧾 ESTATUS
+          const estatusExcel = row.ESTATUS?.toString().toUpperCase();
+          const estatus: EstatusCompra =
+            estatusExcel === "PAGADA"
+              ? EstatusCompra.PAGADA
+              : estatusExcel === "APROBADA"
+              ? EstatusCompra.APROBADA
+              : EstatusCompra.CAPTURADA;
+
+          await prisma.compraAdministrativa.create({
+            data: {
+              proveedorId: proveedor.id,
+              numeroFactura: row.FOLIO.toString(),
+              banco: row.BANCO || null,
+              cuentaClabe: row["CUENTA/CLABE"] || null,
+              empresa: row.EMPRESA || null,
+              moneda: row.MONEDA || "MXN",
+              concepto: row.PRODUCTO || "SIN CONCEPTO",
+              precio,
+              monto,
+              fechaFactura,
+              fechaPago: estatus === EstatusCompra.PAGADA ? fechaPago : null,
+              estatus,
+            },
+          });
+
+          inserted++;
+        } catch (err) {
+          console.error("Fila ignorada:", row, err);
           skipped++;
-          continue;
         }
-
-        // 💲 limpiar montos ($ ,)
-        const monto = Number(
-          row.TOTAL.toString().replace(/[$,]/g, "")
-        );
-
-        const precio = row.PRECIO
-          ? Number(row.PRECIO.toString().replace(/[$,]/g, ""))
-          : null;
-
-        // 📅 fechas
-        const fechaFactura = row["FECHA EMISION"]
-          ? new Date(row["FECHA EMISION"])
-          : null;
-
-        const fechaPago = row["FECHA DEL PAGO"]
-          ? new Date(row["FECHA DEL PAGO"])
-          : null;
-
-        // 🧾 estatus
-        const estatusExcel = row.ESTATUS?.toString().toUpperCase();
-        const estatus: EstatusCompra =
-          estatusExcel === "PAGADA"
-            ? EstatusCompra.PAGADA
-            : estatusExcel === "APROBADA"
-            ? EstatusCompra.APROBADA
-            : EstatusCompra.CAPTURADA;
-
-        await prisma.compraAdministrativa.create({
-          data: {
-            proveedorId: proveedor.id,
-            numeroFactura: row.FOLIO.toString(),
-            banco: row.BANCO || null,
-            cuentaClabe: row["CUENTA/CLABE"] || null,
-            empresa: row.EMPRESA || null,
-            moneda: row.MONEDA || "MXN",
-            concepto: row.PRODUCTO || "SIN CONCEPTO",
-            precio,
-            monto,
-            fechaFactura,
-            fechaPago: estatus === EstatusCompra.PAGADA ? fechaPago : null,
-            estatus,
-          },
-        });
-
-        inserted++;
       }
 
       return NextResponse.json({
@@ -181,7 +204,10 @@ export async function PATCH(req: NextRequest) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+      return NextResponse.json(
+        { error: "ID requerido" },
+        { status: 400 }
+      );
     }
 
     const body = await req.json();
