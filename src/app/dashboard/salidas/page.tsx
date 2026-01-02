@@ -5,7 +5,7 @@ import ModalSalida from "@/components/salidas/ModalSalida";
 import ModalEditarSalida from "@/components/salidas/ModalEditarSalida";
 
 // ==============================
-// TIPADO DE LA DATA 
+// TIPADO
 // ==============================
 interface SalidaType {
   id: number;
@@ -19,9 +19,16 @@ interface SalidaType {
   };
 }
 
+interface ProductoType {
+  id: number;
+  nombre: string;
+  unidad: string;
+  manejaLotes: boolean;
+}
+
 export default function SalidasPage() {
   const [salidas, setSalidas] = useState<SalidaType[]>([]);
-  const [productos, setProductos] = useState([]);
+  const [productos, setProductos] = useState<ProductoType[]>([]);
   const [openModal, setOpenModal] = useState(false);
 
   // MODAL EDITAR
@@ -41,7 +48,7 @@ export default function SalidasPage() {
       const data = await res.json();
       setSalidas(data);
     } catch (error) {
-      console.error("Error cargando salidas:", error);
+      console.error("❌ Error cargando salidas:", error);
     }
   };
 
@@ -54,7 +61,7 @@ export default function SalidasPage() {
       const data = await res.json();
       setProductos(data);
     } catch (error) {
-      console.error("Error cargando productos:", error);
+      console.error("❌ Error cargando productos:", error);
     }
   };
 
@@ -64,7 +71,7 @@ export default function SalidasPage() {
   }, []);
 
   // ============================
-  // ABRIR MODAL EDITAR
+  // EDITAR
   // ============================
   const abrirModalEditar = (salida: SalidaType) => {
     setEditData(salida);
@@ -72,22 +79,27 @@ export default function SalidasPage() {
   };
 
   // ============================
-  // APLICAR FILTROS
+  // FILTROS
   // ============================
   const salidasFiltradas = salidas.filter((s) => {
-    return (
-      (filtroRancho ? (s.rancho || "").toLowerCase().includes(filtroRancho.toLowerCase()) : true) &&
-      (filtroCultivo ? (s.cultivo || "").toLowerCase().includes(filtroCultivo.toLowerCase()) : true)
-    );
+    const ranchoOk = filtroRancho
+      ? (s.rancho || "").toLowerCase().includes(filtroRancho.toLowerCase())
+      : true;
+
+    const cultivoOk = filtroCultivo
+      ? (s.cultivo || "").toLowerCase().includes(filtroCultivo.toLowerCase())
+      : true;
+
+    return ranchoOk && cultivoOk;
   });
 
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-6 text-white">
 
       {/* BOTÓN NUEVA SALIDA */}
       <button
         onClick={() => setOpenModal(true)}
-        className="bg-blue-600 px-4 py-2 rounded"
+        className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-medium"
       >
         + Nueva Salida
       </button>
@@ -100,9 +112,7 @@ export default function SalidasPage() {
         productos={productos}
       />
 
-      {/* ============================
-          MODAL EDITAR (RENDER SEGURO)
-      ============================ */}
+      {/* MODAL EDITAR */}
       {openEdit && editData && (
         <ModalEditarSalida
           open={openEdit}
@@ -112,36 +122,32 @@ export default function SalidasPage() {
         />
       )}
 
-      {/* ============================
-          FILTROS
-      ============================ */}
-      <div className="flex gap-4 mt-6 mb-4">
+      {/* FILTROS */}
+      <div className="flex gap-4">
         <input
-          placeholder="Filtrar por rancho..."
+          placeholder="Filtrar por rancho…"
           value={filtroRancho}
           onChange={(e) => setFiltroRancho(e.target.value)}
-          className="px-3 py-2 bg-[#0f1217] border border-blue-700 text-white rounded"
+          className="px-3 py-2 bg-[#0f1217] border border-blue-700 rounded text-white"
         />
 
         <input
-          placeholder="Filtrar por cultivo..."
+          placeholder="Filtrar por cultivo…"
           value={filtroCultivo}
           onChange={(e) => setFiltroCultivo(e.target.value)}
-          className="px-3 py-2 bg-[#0f1217] border border-blue-700 text-white rounded"
+          className="px-3 py-2 bg-[#0f1217] border border-blue-700 rounded text-white"
         />
       </div>
 
-      {/* ============================
-            TABLA DE MOVIMIENTOS
-      ============================ */}
-      <div className="mt-4 bg-[#0f1217] p-4 rounded-lg border border-gray-700">
-        <h2 className="text-xl font-semibold mb-4 text-white">
+      {/* TABLA */}
+      <div className="bg-[#0f1217] p-4 rounded-lg border border-gray-700">
+        <h2 className="text-xl font-semibold mb-4">
           Movimientos recientes
         </h2>
 
         <table className="w-full text-sm text-gray-300">
           <thead>
-            <tr className="text-left border-b border-gray-700">
+            <tr className="border-b border-gray-700 text-left">
               <th className="py-2">Fecha</th>
               <th className="py-2">Producto</th>
               <th className="py-2">Unidad</th>
@@ -155,13 +161,16 @@ export default function SalidasPage() {
           <tbody>
             {salidasFiltradas.slice(0, 10).map((s) => (
               <tr key={s.id} className="border-b border-gray-800">
-                <td className="py-2">{new Date(s.fecha).toLocaleString("es-MX")}</td>
+                <td className="py-2">
+                  {new Date(s.fecha).toLocaleString("es-MX")}
+                </td>
                 <td className="py-2">{s.producto?.nombre}</td>
                 <td className="py-2">{s.producto?.unidad}</td>
                 <td className="py-2">{s.rancho || "-"}</td>
                 <td className="py-2">{s.cultivo || "-"}</td>
-                <td className="py-2 font-semibold text-red-400">{s.cantidad}</td>
-
+                <td className="py-2 font-semibold text-red-400">
+                  {s.cantidad}
+                </td>
                 <td className="py-2">
                   <button
                     onClick={() => abrirModalEditar(s)}
@@ -170,7 +179,6 @@ export default function SalidasPage() {
                     Editar
                   </button>
                 </td>
-
               </tr>
             ))}
           </tbody>

@@ -25,7 +25,10 @@ export async function GET() {
 }
 
 // ===========================================
-// POST — REGISTRAR SALIDA (FIFO AUTOMÁTICO)
+// POST — REGISTRAR SALIDA
+// LÓGICA:
+// - manejaLotes = false → salida directa
+// - manejaLotes = true  → FIFO por lote
 // ===========================================
 export async function POST(req: Request) {
   try {
@@ -49,22 +52,61 @@ export async function POST(req: Request) {
       );
     }
 
-    if (producto.stock < cantidad) {
+    // ==================================================
+    // 🟢 CASO 1: PRODUCTO NO MANEJA LOTES
+    // ==================================================
+    if (!producto.manejaLotes) {
+
+      if (producto.stock < cantidad) {
+        return NextResponse.json(
+          { error: "Stock insuficiente" },
+          { status: 409 }
+        );
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // 1️⃣ Restar stock general
+        await tx.producto.update({
+          where: { id: producto.id },
+          data: {
+            stock: {
+              decrement: Number(cantidad),
+            },
+          },
+        });
+
+        // 2️⃣ Registrar salida directa
+        await tx.salida.create({
+          data: {
+            productoId: producto.id,
+            cantidad: Number(cantidad),
+            rancho: rancho || null,
+            cultivo: cultivo || null,
+          },
+        });
+      });
+
       return NextResponse.json(
-        { error: "Stock insuficiente" },
-        { status: 409 }
+        {
+          ok: true,
+          tipo: "DIRECTA",
+          message: "Salida registrada sin lote",
+        },
+        { status: 201 }
       );
     }
 
-    // 🔁 FIFO AUTOMÁTICO
+    // ==================================================
+    // 🔵 CASO 2: PRODUCTO MANEJA LOTES (FIFO)
+    // ==================================================
     const resultado = await prisma.$transaction(async (tx) => {
       let restante = Number(cantidad);
       const salidasCreadas = [];
 
-      // 1️⃣ Obtener lotes disponibles ordenados por caducidad
+      // 1️⃣ Obtener lotes disponibles (FIFO)
       const lotes = await tx.inventarioLote.findMany({
         where: {
-          productoId: Number(productoId),
+          productoId: producto.id,
           cantidadDisponible: { gt: 0 },
         },
         orderBy: [
@@ -73,12 +115,16 @@ export async function POST(req: Request) {
         ],
       });
 
+      if (!lotes.length) {
+        throw new Error("Producto requiere lote y no tiene disponibles");
+      }
+
+      // 2️⃣ Descontar de lotes
       for (const lote of lotes) {
         if (restante <= 0) break;
 
         const descontar = Math.min(lote.cantidadDisponible, restante);
 
-        // 2️⃣ Actualizar lote
         await tx.inventarioLote.update({
           where: { id: lote.id },
           data: {
@@ -88,10 +134,9 @@ export async function POST(req: Request) {
           },
         });
 
-        // 3️⃣ Registrar salida ligada al lote
         const salida = await tx.salida.create({
           data: {
-            productoId: Number(productoId),
+            productoId: producto.id,
             inventarioLoteId: lote.id,
             cantidad: descontar,
             rancho: rancho || null,
@@ -104,12 +149,12 @@ export async function POST(req: Request) {
       }
 
       if (restante > 0) {
-        throw new Error("No hay suficiente inventario por lote");
+        throw new Error("Stock insuficiente en lotes");
       }
 
-      // 4️⃣ Actualizar stock total del producto
+      // 3️⃣ Actualizar stock general
       await tx.producto.update({
-        where: { id: Number(productoId) },
+        where: { id: producto.id },
         data: {
           stock: {
             decrement: Number(cantidad),
@@ -123,23 +168,25 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         ok: true,
-        message: "Salida registrada con FIFO por lote",
+        tipo: "LOTE",
+        message: "Salida registrada por lote (FIFO)",
         salidas: resultado,
       },
       { status: 201 }
     );
 
-  } catch (error) {
-    console.error("❌ Error POST salidas FIFO:", error);
+  } catch (error: any) {
+    console.error("❌ Error POST salidas:", error);
+
     return NextResponse.json(
-      { error: "Error al registrar salida por lote" },
+      { error: error.message || "Error al registrar salida" },
       { status: 500 }
     );
   }
 }
 
 // ===========================================
-// PUT — EDITAR METADATOS (NO TOCA STOCK)
+// PUT — EDITAR METADATOS (NO TOCA INVENTARIO)
 // ===========================================
 export async function PUT(req: Request) {
   try {
@@ -153,7 +200,7 @@ export async function PUT(req: Request) {
     }
 
     const salidaExistente = await prisma.salida.findUnique({
-      where: { id },
+      where: { id: Number(id) },
     });
 
     if (!salidaExistente) {
@@ -163,9 +210,8 @@ export async function PUT(req: Request) {
       );
     }
 
-    // ❗ NO SE MODIFICA INVENTARIO AQUÍ
     const salida = await prisma.salida.update({
-      where: { id },
+      where: { id: Number(id) },
       data: {
         cantidad: Number(cantidad),
         rancho: rancho || null,

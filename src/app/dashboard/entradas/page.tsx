@@ -4,12 +4,11 @@ import { useState, useEffect } from "react";
 import ModalEntrada from "@/components/entradas/ModalEntrada";
 
 export default function EntradasPage() {
-  const [entradas, setEntradas] = useState([]);
-  const [productos, setProductos] = useState([]);
+  const [entradas, setEntradas] = useState<any[]>([]);
+  const [productos, setProductos] = useState<any[]>([]);
   const [openModal, setOpenModal] = useState(false);
-  const [editData, setEditData] = useState(null);
-
-  const [recientes, setRecientes] = useState([]); // 🟢 NUEVO
+  const [editData, setEditData] = useState<any>(null);
+  const [recientes, setRecientes] = useState<any[]>([]);
 
   // ============================
   // CARGAR ENTRADAS
@@ -20,7 +19,7 @@ export default function EntradasPage() {
       const data = await res.json();
       setEntradas(data);
     } catch (error) {
-      console.error("Error cargando entradas:", error);
+      console.error("❌ Error cargando entradas:", error);
     }
   };
 
@@ -33,7 +32,7 @@ export default function EntradasPage() {
       const data = await res.json();
       setProductos(data);
     } catch (error) {
-      console.error("Error cargando productos:", error);
+      console.error("❌ Error cargando productos:", error);
     }
   };
 
@@ -46,28 +45,32 @@ export default function EntradasPage() {
       const data = await res.json();
       setRecientes(data);
     } catch (error) {
-      console.error("Error cargando recientes:", error);
+      console.error("❌ Error cargando recientes:", error);
     }
   };
 
   useEffect(() => {
     cargarEntradas();
     cargarProductos();
-    cargarRecientes(); // 🟢 CARGAR RECIENTES 
+    cargarRecientes();
   }, []);
 
   return (
-    <div className="p-6 text-white">
+    <div className="p-6 text-white space-y-8">
 
-      {/* BOTÓN */}
+      {/* =========================
+          BOTÓN NUEVA ENTRADA
+      ========================== */}
       <button
         onClick={() => setOpenModal(true)}
-        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded mb-8"
+        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-medium"
       >
         + Nueva Entrada
       </button>
 
-      {/* MODAL */}
+      {/* =========================
+          MODAL ENTRADA
+      ========================== */}
       <ModalEntrada
         open={openModal}
         onClose={() => {
@@ -76,15 +79,15 @@ export default function EntradasPage() {
         }}
         onSuccess={() => {
           cargarEntradas();
-          cargarRecientes(); // 🟢 ACTUALIZAR RECIENTES DESPUÉS DE GUARDAR
+          cargarRecientes();
         }}
         editData={editData}
-        productos={productos}
+        productos={productos} // 👈 AQUÍ ya viene manejaLotes
       />
 
-      {/* ==============================
+      {/* =========================
           MOVIMIENTOS RECIENTES
-      =============================== */}
+      ========================== */}
       <div className="bg-[#0f171f] p-6 rounded-lg border border-green-800/40 max-w-xl">
         <h2 className="text-xl font-semibold text-green-400 mb-4">
           Últimos movimientos de entradas
@@ -99,7 +102,7 @@ export default function EntradasPage() {
                 key={e.id}
                 className="text-sm border-b border-green-900/30 pb-2"
               >
-                📅 {e.fecha.slice(0, 10)} —{" "}
+                📅 {new Date(e.fecha).toLocaleDateString()} —{" "}
                 <span className="text-green-300 font-medium">
                   {e.producto?.nombre}
                 </span>{" "}

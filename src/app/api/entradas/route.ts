@@ -1,24 +1,33 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 // =====================================================
 // GET → LISTAR ENTRADAS
 // =====================================================
 export async function GET() {
-  const entradas = await prisma.entrada.findMany({
-    orderBy: { id: "desc" },
-    include: {
-      producto: true,
-    },
-  });
+  try {
+    const entradas = await prisma.entrada.findMany({
+      orderBy: { id: "desc" },
+      include: {
+        producto: true,
+      },
+    });
 
-  return NextResponse.json(entradas);
+    return NextResponse.json(entradas);
+  } catch (error) {
+    console.error("❌ Error GET entradas:", error);
+    return NextResponse.json(
+      { error: "Error al obtener entradas" },
+      { status: 500 }
+    );
+  }
 }
 
 // =====================================================
-// POST → REGISTRAR ENTRADA + LOTE + CADUCIDAD (SEGURO)
+// POST → REGISTRAR ENTRADA
+// LÓGICA:
+// - manejaLotes = false → sumar stock directo
+// - manejaLotes = true  → crear InventarioLote
 // =====================================================
 export async function POST(req: Request) {
   try {
@@ -29,33 +38,74 @@ export async function POST(req: Request) {
       fechaCaducidad,
     } = await req.json();
 
-    if (!productoId || !cantidad || !loteCodigo) {
+    if (!productoId || !cantidad || Number(cantidad) <= 0) {
       return NextResponse.json(
-        { error: "Producto, cantidad y lote son obligatorios" },
+        { error: "Producto y cantidad válidos son obligatorios" },
         { status: 400 }
       );
     }
 
-    if (Number(cantidad) <= 0) {
+    const producto = await prisma.producto.findUnique({
+      where: { id: Number(productoId) },
+    });
+
+    if (!producto) {
       return NextResponse.json(
-        { error: "La cantidad debe ser mayor a cero" },
+        { error: "Producto no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    // ==================================================
+    // 🟢 CASO 1: PRODUCTO NO MANEJA LOTES
+    // ==================================================
+    if (!producto.manejaLotes) {
+
+      await prisma.$transaction(async (tx) => {
+        // 1️⃣ Registrar entrada (histórico)
+        await tx.entrada.create({
+          data: {
+            productoId: producto.id,
+            cantidad: Number(cantidad),
+          },
+        });
+
+        // 2️⃣ Sumar stock general
+        await tx.producto.update({
+          where: { id: producto.id },
+          data: {
+            stock: {
+              increment: Number(cantidad),
+            },
+          },
+        });
+      });
+
+      return NextResponse.json(
+        {
+          ok: true,
+          tipo: "DIRECTA",
+          message: "Entrada registrada sin lote",
+        },
+        { status: 201 }
+      );
+    }
+
+    // ==================================================
+    // 🔵 CASO 2: PRODUCTO MANEJA LOTES
+    // ==================================================
+    if (!loteCodigo) {
+      return NextResponse.json(
+        { error: "Lote obligatorio para este producto" },
         { status: 400 }
       );
     }
 
     const resultado = await prisma.$transaction(async (tx) => {
-      const producto = await tx.producto.findUnique({
-        where: { id: Number(productoId) },
-      });
-
-      if (!producto) {
-        throw new Error("Producto no encontrado");
-      }
-
-      // 1️⃣ Crear lote de inventario
+      // 1️⃣ Crear lote
       const inventarioLote = await tx.inventarioLote.create({
         data: {
-          productoId: Number(productoId),
+          productoId: producto.id,
           loteCodigo,
           fechaCaducidad: fechaCaducidad
             ? new Date(fechaCaducidad)
@@ -64,17 +114,17 @@ export async function POST(req: Request) {
         },
       });
 
-      // 2️⃣ Crear entrada (histórico)
+      // 2️⃣ Registrar entrada
       const entrada = await tx.entrada.create({
         data: {
-          productoId: Number(productoId),
+          productoId: producto.id,
           cantidad: Number(cantidad),
         },
       });
 
-      // 3️⃣ Actualizar stock total del producto
+      // 3️⃣ Actualizar stock general
       await tx.producto.update({
-        where: { id: Number(productoId) },
+        where: { id: producto.id },
         data: {
           stock: {
             increment: Number(cantidad),
@@ -85,13 +135,18 @@ export async function POST(req: Request) {
       return { entrada, inventarioLote };
     });
 
-    return NextResponse.json({
-      ok: true,
-      message: "Entrada registrada con lote y caducidad",
-      ...resultado,
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        tipo: "LOTE",
+        message: "Entrada registrada con lote",
+        ...resultado,
+      },
+      { status: 201 }
+    );
+
   } catch (error: any) {
-    console.error("Error creando entrada:", error);
+    console.error("❌ Error POST entradas:", error);
     return NextResponse.json(
       { error: error.message || "Error al registrar la entrada" },
       { status: 500 }

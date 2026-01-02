@@ -1,20 +1,11 @@
-// ========================================================
-//   SCHEMA PRISMA — INVENTARIO AGRÍCOLA PROFESIONAL
-// ========================================================
-
-// ---- CONFIGURACIÓN ----
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// ========================================================
-// ROLES Y USUARIOS
-// ========================================================
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
 model Rol {
   id       Int       @id @default(autoincrement())
@@ -23,21 +14,15 @@ model Rol {
 }
 
 model Usuario {
-  id        Int    @id @default(autoincrement())
-  nombre    String
-  correo    String @unique
-  password  String
-  rolId     Int
-
-  rol       Rol      @relation(fields: [rolId], references: [id])
-  creadoEn  DateTime @default(now())
-
+  id           Int                    @id @default(autoincrement())
+  nombre       String
+  correo       String                 @unique
+  password     String
+  rolId        Int
+  creadoEn     DateTime               @default(now())
   comprasAdmin CompraAdministrativa[]
+  rol          Rol                    @relation(fields: [rolId], references: [id])
 }
-
-// ========================================================
-// CATÁLOGOS
-// ========================================================
 
 model Categoria {
   id          Int        @id @default(autoincrement())
@@ -46,65 +31,44 @@ model Categoria {
   productos   Producto[]
 }
 
-// ========================================================
-// PROVEEDORES (AMPLIADO PARA EXCEL)
-// ========================================================
-
 model Proveedor {
-  id        Int     @id @default(autoincrement())
-  nombre    String
-  telefono  String?
-  correo    String?
-  direccion String?
-  rfc       String?
-
-  // Datos bancarios MXN
-  banco        String?
-  numeroCuenta String?
-  clabe        String?
-
-  // Datos bancarios USD
+  id                  Int                    @id @default(autoincrement())
+  nombre              String
+  telefono            String?
+  direccion           String?
+  banco               String?
   bancoDolares        String?
-  numeroCuentaDolares String?
+  clabe               String?
   clabeDolares        String?
-
-  // Relaciones
-  productos    Producto[]
-  compras      Compra[]
-  comprasAdmin CompraAdministrativa[]
+  correo              String?
+  numeroCuenta        String?
+  numeroCuentaDolares String?
+  rfc                 String?
+  compras             Compra[]
+  comprasAdmin        CompraAdministrativa[]
+  productos           Producto[]
 }
-
-// ========================================================
-// PRODUCTOS DEL INVENTARIO
-// ========================================================
 
 model Producto {
-  id             Int    @id @default(autoincrement())
-  nombre         String
-  unidad         String
-  categoriaId    Int?
-  proveedorId    Int?
-  precioUnitario Float?
-  stock          Float  @default(0)
-  stockMinimo    Float  @default(0)
-
-  categoria Categoria? @relation(fields: [categoriaId], references: [id])
-  proveedor Proveedor? @relation(fields: [proveedorId], references: [id])
-
-  entradas        Entrada[]
-  salidas         Salida[]
+  id              Int              @id @default(autoincrement())
+  nombre          String
+  unidad          String
+  stock           Float            @default(0)
+  creadoEn        DateTime         @default(now())
+  categoriaId     Int?
+  actualizadoEn   DateTime         @updatedAt
+  precioUnitario  Float?
+  proveedorId     Int?
+  stockMinimo     Float            @default(0)
   compras         Compra[]
-  ingredientes    Ingrediente[]
   consumos        Consumo[]
+  entradas        Entrada[]
+  ingredientes    Ingrediente[]
   inventarioLotes InventarioLote[]
-
-  creadoEn      DateTime @default(now())
-  actualizadoEn DateTime @updatedAt
+  categoria       Categoria?       @relation(fields: [categoriaId], references: [id])
+  proveedor       Proveedor?       @relation(fields: [proveedorId], references: [id])
+  salidas         Salida[]
 }
-
-// ========================================================
-// INVENTARIO POR LOTE (LOTE + CADUCIDAD)
-// ========================================================
 
 model InventarioLote {
   id                 Int       @id @default(autoincrement())
@@ -113,105 +77,67 @@ model InventarioLote {
   fechaCaducidad     DateTime?
   cantidadDisponible Float
   fechaEntrada       DateTime  @default(now())
-
-  producto Producto @relation(fields: [productoId], references: [id])
-  salidas  Salida[]
+  producto           Producto  @relation(fields: [productoId], references: [id])
+  salidas            Salida[]
 
   @@index([productoId])
 }
-
-// ========================================================
-// MOVIMIENTOS DE INVENTARIO
-// ========================================================
 
 model Entrada {
   id         Int      @id @default(autoincrement())
   productoId Int
   cantidad   Float
   fecha      DateTime @default(now())
-
-  producto Producto @relation(fields: [productoId], references: [id])
+  producto   Producto @relation(fields: [productoId], references: [id])
 }
 
 model Salida {
-  id               Int      @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
   productoId       Int
-  inventarioLoteId Int?
   cantidad         Float
-  fecha            DateTime @default(now())
-
-  rancho  String?
-  cultivo String?
-
-  producto       Producto        @relation(fields: [productoId], references: [id])
-  inventarioLote InventarioLote? @relation(fields: [inventarioLoteId], references: [id])
+  fecha            DateTime        @default(now())
+  cultivo          String?
+  rancho           String?
+  inventarioLoteId Int?
+  inventarioLote   InventarioLote? @relation(fields: [inventarioLoteId], references: [id])
+  producto         Producto        @relation(fields: [productoId], references: [id])
 }
-
-// ========================================================
-// COMPRAS OPERATIVAS (AFECTAN INVENTARIO)
-// ========================================================
 
 model Compra {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   productoId  Int
-  proveedorId Int
   costo       Float
   cantidad    Float
-  fecha       DateTime @default(now())
-
-  producto  Producto  @relation(fields: [productoId], references: [id])
-  proveedor Proveedor @relation(fields: [proveedorId], references: [id])
-}
-
-// ========================================================
-// COMPRAS ADMINISTRATIVAS (FACTURAS / EXCEL / ESTATUS)
-// ========================================================
-
-enum EstatusCompra {
-  CAPTURADA
-  APROBADA
-  PAGADA
+  fecha       DateTime  @default(now())
+  proveedorId Int
+  producto    Producto  @relation(fields: [productoId], references: [id])
+  proveedor   Proveedor @relation(fields: [proveedorId], references: [id])
 }
 
 model CompraAdministrativa {
   id            Int           @id @default(autoincrement())
-
-  // Relaciones
   proveedorId   Int
   usuarioId     Int?
-
-  // Datos tipo Excel / Factura
+  fechaFactura  DateTime?
   numeroFactura String?
+  concepto      String
+  monto         Float
+  estatus       EstatusCompra @default(CAPTURADA)
+  fechaPago     DateTime?
+  observaciones String?
+  creadoEn      DateTime      @default(now())
+  actualizadoEn DateTime      @updatedAt
   banco         String?
   cuentaClabe   String?
   empresa       String?
   moneda        String        @default("MXN")
-
-  concepto      String
   precio        Float?
-  monto         Float
-
-  fechaFactura  DateTime?
-  fechaPago     DateTime?
-
-  // Control administrativo
-  estatus       EstatusCompra @default(CAPTURADA)
-  observaciones String?
-
-  // Auditoría
-  creadoEn      DateTime      @default(now())
-  actualizadoEn DateTime      @updatedAt
-
-  proveedor Proveedor @relation(fields: [proveedorId], references: [id])
-  usuario   Usuario?  @relation(fields: [usuarioId], references: [id])
+  proveedor     Proveedor     @relation(fields: [proveedorId], references: [id])
+  usuario       Usuario?      @relation(fields: [usuarioId], references: [id])
 
   @@index([estatus])
   @@index([proveedorId])
 }
-
-// ========================================================
-// RECETAS — MEZCLAS AGRÍCOLAS / ALIMENTOS / FERTILIZANTES
-// ========================================================
 
 model Receta {
   id           Int           @id @default(autoincrement())
@@ -220,25 +146,19 @@ model Receta {
 }
 
 model Ingrediente {
-  id         Int   @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   recetaId   Int
   productoId Int
   cantidad   Float
-
-  receta   Receta   @relation(fields: [recetaId], references: [id])
-  producto Producto @relation(fields: [productoId], references: [id])
+  producto   Producto @relation(fields: [productoId], references: [id])
+  receta     Receta   @relation(fields: [recetaId], references: [id])
 }
 
-// ========================================================
-// REGISTROS AGRÍCOLAS PROFESIONALES (LOTES DE CAMPO)
-// ========================================================
-
 model Lote {
-  id      Int     @id @default(autoincrement())
-  nombre  String
-  cultivo String?
-  areaHa  Float?
-
+  id       Int       @id @default(autoincrement())
+  nombre   String
+  cultivo  String?
+  areaHa   Float?
   consumos Consumo[]
 }
 
@@ -248,7 +168,12 @@ model Consumo {
   productoId Int
   cantidad   Float
   fecha      DateTime @default(now())
+  lote       Lote     @relation(fields: [loteId], references: [id])
+  producto   Producto @relation(fields: [productoId], references: [id])
+}
 
-  lote     Lote     @relation(fields: [loteId], references: [id])
-  producto Producto @relation(fields: [productoId], references: [id])
+enum EstatusCompra {
+  CAPTURADA
+  APROBADA
+  PAGADA
 }
