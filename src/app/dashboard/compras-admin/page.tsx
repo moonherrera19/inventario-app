@@ -116,37 +116,41 @@ export default function ComprasAdminPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Compras");
     XLSX.writeFile(wb, "reporte_compras.xlsx");
-    const manejarCargaMasiva = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  const data = await file.arrayBuffer();
-  const workbook = XLSX.read(data);
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows: any[] = XLSX.utils.sheet_to_json(sheet);
-
-  // Espera columnas:
-  // proveedorId | empresa | folio | concepto | total | banco
-  for (const row of rows) {
-    await fetch("/api/compras-admin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        proveedorId: row.proveedorId,
-        empresa: row.empresa,
-        folio: row.folio,
-        concepto: row.concepto,
-        total: row.total,
-        banco: row.banco || tipoBanco,
-      }),
-    });
-  }
-
-  fetchCompras();
-  alert("Carga masiva completada");
-};
-
+    
   };
+   // ===============================
+  // CARGA MASIVA DESDE EXCEL ✅ (ESTO FALTABA)
+  // ===============================
+  const manejarCargaMasiva = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+
+    for (const row of rows) {
+      await fetch("/api/compras-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proveedorId: row.proveedorId,
+          empresa: row.empresa,
+          folio: row.folio,
+          concepto: row.concepto,
+          total: row.total,
+          banco: row.banco || tipoBanco,
+        }),
+      });
+    }
+
+    fetchCompras();
+    alert("Carga masiva completada");
+  };
+
 
   // ===============================
   // EXPORTAR PDF
