@@ -15,9 +15,9 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const workbook = XLSX.read(buffer);
+    const workbook = XLSX.read(buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json<any>(sheet);
+    const rows = XLSX.utils.sheet_to_json<any>(sheet, { defval: null });
 
     let creados = 0;
     let duplicados = 0;
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
       const nombre = String(row.NOMBRE).trim();
 
-      // 🔒 Evitar duplicados
+      // 🔒 Evitar duplicados por nombre
       const existe = await prisma.proveedor.findFirst({
         where: { nombre },
       });
@@ -41,20 +41,20 @@ export async function POST(req: NextRequest) {
         data: {
           nombre,
 
+          // ===== DATOS GENERALES =====
           telefono: row.TELEFONO?.toString() || null,
-          correo: row.CORREO || null,
           direccion: row.DIRECCION || null,
           rfc: row.RFC || null,
 
-          // MXN
-          banco: row.BANCO || null,
-          numeroCuenta: row["NUMERO DE CUENTA"] || null,
-          clabe: row.CLABE || null,
+          // ===== MXN =====
+          banco: row.BANCO_MXN || null,
+          numeroCuenta: row.CUENTA_MXN?.toString() || null,
+          clabe: row.CLABE_MXN?.toString() || null,
 
-          // USD (opcionales)
-          bancoDolares: row["BANCO DÓLARES"] || null,
-          numeroCuentaDolares: row["CUENTA DOLARES"] || null,
-          clabeDolares: row["CLABE DOLARES"] || null,
+          // ===== USD (OPCIONAL) =====
+          bancoDolares: row.BANCO_USD || null,
+          numeroCuentaDolares: row.CUENTA_USD?.toString() || null,
+          clabeDolares: row.CLABE_USD?.toString() || null,
         },
       });
 
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      message: "Importación finalizada",
+      message: "Importación finalizada correctamente",
       creados,
       duplicados,
     });
