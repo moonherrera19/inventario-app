@@ -34,7 +34,7 @@ export default function ProveedoresPage() {
   }, []);
 
   // ======================================================
-  // IMPORTAR EXCEL
+  // IMPORTAR EXCEL (CORREGIDO)
   // ======================================================
   const importarExcel = async (file: File) => {
     const formData = new FormData();
@@ -51,7 +51,13 @@ export default function ProveedoresPage() {
           throw new Error("Error al importar");
         }
 
-        alert("Proveedores importados correctamente");
+        const json = await res.json();
+
+        alert(
+          `Importación completada\n\n` +
+          `Proveedores creados: ${json.proveedoresCreados ?? json.creados ?? 0}`
+        );
+
         cargarProveedores();
       } catch (error) {
         console.error(error);
@@ -81,9 +87,8 @@ export default function ProveedoresPage() {
 
   return (
     <div className="min-h-screen p-6 bg-[#0f1217] text-white">
-      {/* ================================================== */}
+
       {/* HEADER */}
-      {/* ================================================== */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <h1 className="text-4xl font-bold text-green-400">
           Proveedores
@@ -123,9 +128,7 @@ export default function ProveedoresPage() {
         </div>
       </div>
 
-      {/* ================================================== */}
       {/* TABLA */}
-      {/* ================================================== */}
       <div className="bg-[#1a1f25] p-4 rounded-xl border border-green-800/40 shadow-lg">
         {loading ? (
           <p className="text-gray-400">Cargando proveedores…</p>
@@ -194,9 +197,7 @@ export default function ProveedoresPage() {
         )}
       </div>
 
-      {/* ================================================== */}
       {/* MODAL */}
-      {/* ================================================== */}
       {openModal && (
         <ModalProveedor
           close={() => setOpenModal(false)}

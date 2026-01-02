@@ -20,25 +20,41 @@ export async function POST(req: NextRequest) {
     const rows = XLSX.utils.sheet_to_json<any>(sheet);
 
     let creados = 0;
+    let duplicados = 0;
 
     for (const row of rows) {
       if (!row.NOMBRE) continue;
 
+      const nombre = String(row.NOMBRE).trim();
+
+      // 🔒 Evitar duplicados
+      const existe = await prisma.proveedor.findFirst({
+        where: { nombre },
+      });
+
+      if (existe) {
+        duplicados++;
+        continue;
+      }
+
       await prisma.proveedor.create({
         data: {
-          nombre: String(row.NOMBRE).trim(),
+          nombre,
+
           telefono: row.TELEFONO?.toString() || null,
           correo: row.CORREO || null,
           direccion: row.DIRECCION || null,
           rfc: row.RFC || null,
 
-          banco: row.BANCO_MXN || null,
-          numeroCuenta: row.CUENTA_MXN || null,
-          clabe: row.CLABE_MXN || null,
+          // MXN
+          banco: row.BANCO || null,
+          numeroCuenta: row["NUMERO DE CUENTA"] || null,
+          clabe: row.CLABE || null,
 
-          bancoDolares: row.BANCO_USD || null,
-          numeroCuentaDolares: row.CUENTA_USD || null,
-          clabeDolares: row.CLABE_USD || null,
+          // USD (opcionales)
+          bancoDolares: row["BANCO DÓLARES"] || null,
+          numeroCuentaDolares: row["CUENTA DOLARES"] || null,
+          clabeDolares: row["CLABE DOLARES"] || null,
         },
       });
 
@@ -46,8 +62,9 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      message: "Importación completada",
-      proveedoresCreados: creados,
+      message: "Importación finalizada",
+      creados,
+      duplicados,
     });
   } catch (error) {
     console.error("❌ Error importando proveedores:", error);
