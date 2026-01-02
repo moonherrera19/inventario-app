@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // ======================================================
-// GET - Obtener todos los productos (SEGURO)
+// GET - LISTADO DE PRODUCTOS (PRODUCTIVO Y ESTABLE)
 // ======================================================
 export async function GET() {
   try {
@@ -14,22 +14,23 @@ export async function GET() {
       },
     });
 
-    // 🔒 SIEMPRE ARRAY
-    return NextResponse.json(Array.isArray(productos) ? productos : []);
+    // 👉 El frontend espera SIEMPRE un array
+    return NextResponse.json(productos);
   } catch (error) {
     console.error("❌ Error GET productos:", error);
 
-    // 🔒 NUNCA devolver objeto si el front espera array
+    // 👉 Para tablas/listados: array vacío, no objeto
     return NextResponse.json([]);
   }
 }
 
 // ======================================================
-// POST - Crear nuevo producto
+// POST - CREAR PRODUCTO
 // ======================================================
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+
     let {
       nombre,
       unidad,
@@ -102,11 +103,12 @@ export async function POST(req: Request) {
 }
 
 // ======================================================
-// PUT - Actualizar producto
+// PUT - ACTUALIZAR PRODUCTO
 // ======================================================
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
+
     let {
       id,
       nombre,
@@ -177,7 +179,7 @@ export async function PUT(req: Request) {
 }
 
 // ======================================================
-// DELETE - Eliminar producto
+// DELETE - ELIMINAR PRODUCTO (CON VALIDACIÓN)
 // ======================================================
 export async function DELETE(req: Request) {
   try {
