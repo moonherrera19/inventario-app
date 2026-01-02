@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import ModalProveedor from "@/components/proveedores/ModalProveedor";
 
 export default function ProveedoresPage() {
@@ -10,6 +10,7 @@ export default function ProveedoresPage() {
   const [openModal, setOpenModal] = useState(false);
   const [editData, setEditData] = useState<any | null>(null);
 
+  const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
 
   // ======================================================
@@ -34,7 +35,27 @@ export default function ProveedoresPage() {
   }, []);
 
   // ======================================================
-  // IMPORTAR EXCEL (CORREGIDO)
+  // FILTRO DE BÚSQUEDA
+  // ======================================================
+  const proveedoresFiltrados = useMemo(() => {
+    if (!search.trim()) return proveedores;
+
+    const q = search.toLowerCase();
+
+    return proveedores.filter((p) =>
+      [
+        p.nombre,
+        p.banco,
+        p.bancoDolares,
+        p.rfc,
+      ]
+        .filter(Boolean)
+        .some((v: string) => v.toLowerCase().includes(q))
+    );
+  }, [search, proveedores]);
+
+  // ======================================================
+  // IMPORTAR EXCEL
   // ======================================================
   const importarExcel = async (file: File) => {
     const formData = new FormData();
@@ -47,37 +68,32 @@ export default function ProveedoresPage() {
           body: formData,
         });
 
-        if (!res.ok) {
-          throw new Error("Error al importar");
-        }
+        if (!res.ok) throw new Error();
 
         const json = await res.json();
 
         alert(
           `Importación completada\n\n` +
-          `Proveedores creados: ${json.proveedoresCreados ?? json.creados ?? 0}`
+          `Creados: ${json.creados ?? 0}\n` +
+          `Duplicados: ${json.duplicados ?? 0}`
         );
 
         cargarProveedores();
-      } catch (error) {
-        console.error(error);
+      } catch {
         alert("Error al importar proveedores");
       }
     });
   };
 
   // ======================================================
-  // ELIMINAR PROVEEDOR
+  // ELIMINAR
   // ======================================================
   const eliminarProveedor = async (id: number) => {
     if (!confirm("¿Seguro que deseas eliminar este proveedor?")) return;
 
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/proveedores?id=${id}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) throw new Error();
+        await fetch(`/api/proveedores?id=${id}`, { method: "DELETE" });
         cargarProveedores();
       } catch {
         alert("Error al eliminar proveedor");
@@ -90,12 +106,9 @@ export default function ProveedoresPage() {
 
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-        <h1 className="text-4xl font-bold text-green-400">
-          Proveedores
-        </h1>
+        <h1 className="text-4xl font-bold text-green-400">Proveedores</h1>
 
-        <div className="flex gap-3 items-center">
-          {/* IMPORTAR EXCEL */}
+        <div className="flex gap-3">
           <input
             type="file"
             accept=".xlsx,.xls"
@@ -115,7 +128,6 @@ export default function ProveedoresPage() {
             Importar Excel
           </label>
 
-          {/* NUEVO PROVEEDOR */}
           <button
             onClick={() => {
               setEditData(null);
@@ -128,18 +140,28 @@ export default function ProveedoresPage() {
         </div>
       </div>
 
-      {/* TABLA */}
-      <div className="bg-[#1a1f25] p-4 rounded-xl border border-green-800/40 shadow-lg">
+      {/* CONTENEDOR PRINCIPAL */}
+      <div className="bg-[#1a1f25] rounded-xl border border-green-800/40 shadow-lg p-4">
+
+        {/* BUSCADOR */}
+        <div className="mb-4">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, banco o RFC…"
+            className="w-full md:w-96 px-4 py-2 rounded-lg bg-[#0f1217] border border-green-800/40 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600"
+          />
+        </div>
+
+        {/* TABLA */}
         {loading ? (
           <p className="text-gray-400">Cargando proveedores…</p>
-        ) : proveedores.length === 0 ? (
-          <p className="text-gray-400">
-            No hay proveedores registrados.
-          </p>
+        ) : proveedoresFiltrados.length === 0 ? (
+          <p className="text-gray-400">No hay resultados.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-[1300px] w-full text-sm">
-              <thead>
+          <div className="max-h-[65vh] overflow-auto rounded-lg">
+            <table className="min-w-[1200px] w-full text-sm">
+              <thead className="sticky top-0 bg-[#1a1f25] z-10">
                 <tr className="text-green-300 border-b border-green-800/40">
                   <th className="py-3">Nombre</th>
                   <th>Banco MXN</th>
@@ -154,7 +176,7 @@ export default function ProveedoresPage() {
               </thead>
 
               <tbody>
-                {proveedores.map((p) => (
+                {proveedoresFiltrados.map((p) => (
                   <tr
                     key={p.id}
                     className="border-b border-green-800/20 hover:bg-green-900/10"
