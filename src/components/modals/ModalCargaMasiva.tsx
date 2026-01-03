@@ -49,21 +49,20 @@ export default function ModalCargaMasiva({
         body: JSON.stringify({ rows }),
       });
 
-      // 🔴 AQUÍ ESTABA EL PROBLEMA: ahora sí leemos la respuesta
       const data = await res.json();
       console.log("📦 Respuesta backend:", data);
 
       if (!res.ok || !data.ok) {
-        alert("❌ Error en la carga masiva");
+        alert(data?.error || "❌ Error en la carga masiva");
         return;
       }
 
-      // 3️⃣ MENSAJE CLARO AL USUARIO
+      // 3️⃣ MENSAJE CORRECTO (SEGÚN BACKEND REAL)
       alert(
         `✅ Carga masiva completada\n\n` +
-        `Total filas: ${data.resumen.totalFilas}\n` +
-        `Insertadas: ${data.resumen.insertados}\n` +
-        `Ignoradas: ${data.resumen.ignorados}`
+        `Total filas: ${data.total}\n` +
+        `Insertadas: ${data.insertados}\n` +
+        `Ignoradas: ${data.ignorados}`
       );
 
       // 4️⃣ Refrescar tabla
