@@ -1,10 +1,13 @@
+export const runtime = "nodejs"; // 🔴 ESTO ES LA CLAVE
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { EstatusCompra } from "@prisma/client";
 
 export async function POST(req: Request) {
   try {
-    const { rows } = await req.json();
+    const body = await req.json();
+    const rows = body.rows;
 
     if (!Array.isArray(rows)) {
       return NextResponse.json(
@@ -18,9 +21,6 @@ export async function POST(req: Request) {
 
     for (const row of rows) {
       try {
-        // ============================
-        // VALIDACIONES MÍNIMAS
-        // ============================
         const proveedorNombre =
           row.PROVEEDOR || row.PROVEDOR || null;
         const folio = row.FOLIO || null;
@@ -31,9 +31,6 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // ============================
-        // BUSCAR PROVEEDOR
-        // ============================
         const proveedor = await prisma.proveedor.findFirst({
           where: {
             nombre: {
@@ -48,9 +45,6 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // ============================
-        // MONTO (ÚNICO NÚMERO)
-        // ============================
         const monto = Number(
           String(totalRaw).replace(/[$,]/g, "")
         );
@@ -60,52 +54,30 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // ============================
-        // CREATE (TODO STRING / NULL)
-        // ============================
         await prisma.compraAdministrativa.create({
           data: {
             proveedorId: proveedor.id,
-
             numeroFactura: String(folio),
-
             concepto: row.PRODUCTO
               ? String(row.PRODUCTO)
               : "SIN CONCEPTO",
-
-            banco: row.BANCO
-              ? String(row.BANCO)
-              : null,
-
+            banco: row.BANCO ? String(row.BANCO) : null,
             cuentaClabe: row["CUENTA/CLABE"]
               ? String(row["CUENTA/CLABE"])
               : null,
-
-            empresa: row.EMPRESA
-              ? String(row.EMPRESA)
-              : null,
-
-            moneda: row.MONEDA
-              ? String(row.MONEDA)
-              : "MXN",
-
-            // ❌ NO convertir precio
+            empresa: row.EMPRESA ? String(row.EMPRESA) : null,
+            moneda: row.MONEDA ? String(row.MONEDA) : "MXN",
             precio: null,
-
-            // ✅ SOLO MONTO NUMÉRICO
             monto,
-
             estatus: EstatusCompra.CAPTURADA,
-
-            // ❌ NO fechas
             fechaFactura: null,
             fechaPago: null,
           },
         });
 
         insertados++;
-      } catch (err) {
-        console.error("Fila ignorada:", row, err);
+      } catch (e) {
+        console.error("Fila ignorada", row, e);
         ignorados++;
       }
     }
@@ -116,7 +88,7 @@ export async function POST(req: Request) {
       ignorados,
     });
   } catch (error) {
-    console.error("Error general:", error);
+    console.error("ERROR GENERAL:", error);
     return NextResponse.json(
       { error: "Error al procesar el archivo" },
       { status: 500 }
