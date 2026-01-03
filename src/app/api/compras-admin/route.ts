@@ -78,7 +78,23 @@ export async function POST(req: NextRequest) {
                 .replace(/[$,]/g, "")
             ),
 
-            estatus: EstatusCompra.CAPTURADA,
+            estatus:
+  String(
+    row["ESTATUS"] ??
+    row["STATUS"] ??
+    row["ESTADO"] ??
+    ""
+  ).toUpperCase() === "PAGADA"
+    ? EstatusCompra.PAGADA
+    : String(
+        row["ESTATUS"] ??
+        row["STATUS"] ??
+        row["ESTADO"] ??
+        ""
+      ).toUpperCase() === "APROBADA"
+    ? EstatusCompra.APROBADA
+    : EstatusCompra.CAPTURADA,
+
           },
         });
 
