@@ -7,11 +7,14 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // ===============================
-// GET → listar compras
+// GET → listar compras (INCLUYE PROVEEDOR)
 // ===============================
 export async function GET() {
   try {
     const compras = await prisma.compraAdministrativa.findMany({
+      include: {
+        proveedor: true, // 🔥 CLAVE: evita pantalla negra en el front
+      },
       orderBy: { creadoEn: "desc" },
     });
 
@@ -43,7 +46,7 @@ export async function POST(req: NextRequest) {
       try {
         await prisma.compraAdministrativa.create({
           data: {
-            // 🔥 CLAVE PARA QUE COMPILE
+            // 🔥 FORZADO PARA QUE NO TRUENE PRISMA
             proveedorId: 1,
 
             proveedorNombre: String(
