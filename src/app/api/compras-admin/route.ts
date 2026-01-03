@@ -1,15 +1,17 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { EstatusCompra } from "@prisma/client";
 import * as XLSX from "xlsx";
 
+/**
+ * ⛔ MUY IMPORTANTE
+ * Evita cacheo en App Router (Vercel / producción)
+ */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 // ======================================================
-// GET → listar compras + filtros + totales
+// GET → listar compras + totales
 // ======================================================
 export async function GET(req: NextRequest) {
   try {
@@ -31,7 +33,10 @@ export async function GET(req: NextRequest) {
       _sum: { monto: true },
     });
 
-    return NextResponse.json({ compras, totales });
+    return NextResponse.json(
+      { compras, totales },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -49,34 +54,28 @@ export async function POST(req: NextRequest) {
     const contentType = req.headers.get("content-type") || "";
 
     // ==================================================
-    // 🔹 IMPORTAR EXCEL (FORMATO HUMANO)
+    // 🔹 IMPORTAR EXCEL DESDE MODAL (JSON rows)
     // ==================================================
-    if (contentType.includes("multipart/form-data")) {
-      const formData = await req.formData();
-      const file = formData.get("file") as File | null;
+    if (contentType.includes("application/json")) {
+      const { rows } = await req.json();
 
-      if (!file) {
+      if (!Array.isArray(rows)) {
         return NextResponse.json(
-          { error: "Archivo no encontrado" },
+          { error: "Formato inválido" },
           { status: 400 }
         );
       }
 
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const workbook = XLSX.read(buffer);
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-      // 🔑 CLAVE: raw:false
-      const rows = XLSX.utils.sheet_to_json<any>(sheet, { raw: false });
-
-      let inserted = 0;
-      let skipped = 0;
+      let insertados = 0;
+      let ignorados = 0;
 
       for (const row of rows) {
         try {
-          const proveedorNombre = row.PROVEEDOR || row.PROVEDOR;
+          const proveedorNombre =
+            row.PROVEEDOR || row.PROVEDOR || row.proveedor;
+
           if (!proveedorNombre || !row.FOLIO || !row.TOTAL) {
-            skipped++;
+            ignorados++;
             continue;
           }
 
@@ -90,11 +89,10 @@ export async function POST(req: NextRequest) {
           });
 
           if (!proveedor) {
-            skipped++;
+            ignorados++;
             continue;
           }
 
-          // 💲 Montos
           const monto = Number(
             row.TOTAL.toString().replace(/[$,]/g, "")
           );
@@ -103,36 +101,13 @@ export async function POST(req: NextRequest) {
             ? Number(row.PRECIO.toString().replace(/[$,]/g, ""))
             : null;
 
-          // 📅 FECHA EMISIÓN
-          let fechaFactura: Date | null = null;
-          if (row["FECHA EMISION"]) {
-            const parsed = XLSX.SSF.parse_date_code(
-              Number(row["FECHA EMISION"])
-            );
-            if (parsed) {
-              fechaFactura = new Date(parsed.y, parsed.m - 1, parsed.d);
-            }
-          }
+          const fechaFactura = row["FECHA EMISION"]
+            ? new Date(row["FECHA EMISION"])
+            : null;
 
-          // 📅 FECHA PAGO
-          let fechaPago: Date | null = null;
-          if (row["FECHA DEL PAGO"]) {
-            const parsed = XLSX.SSF.parse_date_code(
-              Number(row["FECHA DEL PAGO"])
-            );
-            if (parsed) {
-              fechaPago = new Date(parsed.y, parsed.m - 1, parsed.d);
-            }
-          }
-
-          // 🧾 ESTATUS
-          const estatusExcel = row.ESTATUS?.toString().toUpperCase();
-          const estatus: EstatusCompra =
-            estatusExcel === "PAGADA"
-              ? EstatusCompra.PAGADA
-              : estatusExcel === "APROBADA"
-              ? EstatusCompra.APROBADA
-              : EstatusCompra.CAPTURADA;
+          const fechaPago = row["FECHA DEL PAGO"]
+            ? new Date(row["FECHA DEL PAGO"])
+            : null;
 
           await prisma.compraAdministrativa.create({
             data: {
@@ -146,22 +121,22 @@ export async function POST(req: NextRequest) {
               precio,
               monto,
               fechaFactura,
-              fechaPago: estatus === EstatusCompra.PAGADA ? fechaPago : null,
-              estatus,
+              fechaPago,
+              estatus: EstatusCompra.CAPTURADA,
             },
           });
 
-          inserted++;
+          insertados++;
         } catch (err) {
           console.error("Fila ignorada:", row, err);
-          skipped++;
+          ignorados++;
         }
       }
 
       return NextResponse.json({
-        message: "Importación completada",
-        registrosInsertados: inserted,
-        registrosIgnorados: skipped,
+        message: "Carga masiva completada",
+        insertados,
+        ignorados,
       });
     }
 
