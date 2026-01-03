@@ -41,12 +41,11 @@ export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get("content-type") || "";
 
-    // ================================================
+    // ==================================================
     // 🔹 CARGA MASIVA DESDE EXCEL (JSON)
-// ================================================
+// ==================================================
     if (contentType.includes("application/json")) {
-      const body = await req.json();
-      const rows = body.rows;
+      const { rows } = await req.json();
 
       if (!Array.isArray(rows)) {
         return NextResponse.json(
@@ -60,12 +59,13 @@ export async function POST(req: NextRequest) {
 
       for (const row of rows) {
         try {
+          // 🔑 LECTURA EXACTA DE TU EXCEL
           const proveedorNombre = String(
-            row.PROVEEDOR || row.PROVEDOR || ""
+            row["PROVEDOR:"] || ""
           ).trim();
 
-          const folio = String(row.FOLIO || "").trim();
-          const totalRaw = String(row.TOTAL || "").replace(/[$,]/g, "");
+          const folio = String(row["FOLIO"] || "").trim();
+          const totalRaw = String(row["TOTAL:"] || "").replace(/[$,]/g, "");
 
           if (!proveedorNombre || !folio || !totalRaw) {
             ignorados++;
@@ -92,8 +92,8 @@ export async function POST(req: NextRequest) {
             continue;
           }
 
-          const precio = row.PRECIO
-            ? Number(String(row.PRECIO).replace(/[$,]/g, ""))
+          const precio = row["PRECIO"]
+            ? Number(String(row["PRECIO"]).replace(/[$,]/g, ""))
             : null;
 
           const fechaFactura = row["FECHA EMISION"]
@@ -104,22 +104,34 @@ export async function POST(req: NextRequest) {
             ? new Date(row["FECHA DEL PAGO"])
             : null;
 
+          const estatusExcel = String(row["ESTATUS"] || "CAPTURADA").toUpperCase();
+          const estatus: EstatusCompra =
+            estatusExcel === "PAGADA"
+              ? EstatusCompra.PAGADA
+              : estatusExcel === "APROBADA"
+              ? EstatusCompra.APROBADA
+              : EstatusCompra.CAPTURADA;
+
           await prisma.compraAdministrativa.create({
             data: {
               proveedorId: proveedor.id,
               numeroFactura: folio,
-              concepto: String(row.PRODUCTO || "SIN CONCEPTO"),
-              banco: row.BANCO ? String(row.BANCO) : null,
-              cuentaClabe: row["CUENTA/CLABE"]
-                ? String(row["CUENTA/CLABE"])
+              concepto: String(row["PRODUCTO"] || "SIN CONCEPTO"),
+              banco: row["BANCO:"] ? String(row["BANCO:"]) : null,
+              cuentaClabe: row["CUENTA/CLABE:"]
+                ? String(row["CUENTA/CLABE:"])
                 : null,
-              empresa: row.EMPRESA ? String(row.EMPRESA) : null,
-              moneda: row.MONEDA ? String(row.MONEDA) : "MXN",
+              empresa: row["EMPRESA:"]
+                ? String(row["EMPRESA:"])
+                : null,
+              moneda: row["MONEDA:"]
+                ? String(row["MONEDA:"])
+                : "MXN",
               precio,
               monto,
               fechaFactura,
               fechaPago,
-              estatus: EstatusCompra.CAPTURADA,
+              estatus,
             },
           });
 
@@ -137,9 +149,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ================================================
+    // ==================================================
     // 🔹 ALTA MANUAL
-    // ================================================
+    // ==================================================
     const body = await req.json();
 
     const compra = await prisma.compraAdministrativa.create({
