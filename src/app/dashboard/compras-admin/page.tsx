@@ -153,7 +153,8 @@ const exportarExcel = () => {
       startY: 25,
       head: [["Proveedor", "Folio", "Fecha", "Total", "Estatus"]],
       body: comprasFiltradas.map(c => [
-        c.proveedor.nombre,
+        c.proveedor?.nombre || "SIN PROVEEDOR"
+,
         c.numeroFactura || "",
         c.fechaFactura?.slice(0, 10) || "",
         `$${c.monto.toFixed(2)}`,
