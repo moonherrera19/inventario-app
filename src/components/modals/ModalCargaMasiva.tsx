@@ -28,24 +28,37 @@ export default function ModalCargaMasiva({
     setLoading(true);
 
     try {
+      // 📄 Leer Excel
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer);
+      const workbook = XLSX.read(buffer, { type: "array" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
+      const rows = XLSX.utils.sheet_to_json(sheet, {
+        defval: "",
+        raw: false, // 🔑 CLAVE para fechas y números
+      });
+
+      // 🚀 Enviar al backend (RUTA CORRECTA)
       const res = await fetch("/api/compras-admin/carga-masiva", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ rows }),
       });
 
       if (!res.ok) {
+        const err = await res.json();
+        console.error("Error backend:", err);
         throw new Error("Error en la carga");
       }
 
+      // ✅ Refrescar datos
       onSuccess();
-      onClose();
+
+      // 🧹 Limpiar y cerrar
       setFile(null);
+      onClose();
     } catch (error) {
       console.error(error);
       alert("Error al procesar el archivo");
@@ -61,6 +74,7 @@ export default function ModalCargaMasiva({
           Carga masiva (Excel)
         </h2>
 
+        {/* INPUT REAL */}
         <input
           id="file-upload"
           type="file"
@@ -69,6 +83,7 @@ export default function ModalCargaMasiva({
           className="hidden"
         />
 
+        {/* BOTÓN */}
         <label
           htmlFor="file-upload"
           className="inline-block bg-gray-700 px-4 py-2 rounded text-white cursor-pointer mb-3"
@@ -76,12 +91,14 @@ export default function ModalCargaMasiva({
           Elegir archivo
         </label>
 
+        {/* INFO */}
         <p className="text-sm mb-4 text-gray-300">
           {file
             ? `Archivo seleccionado: ${file.name}`
             : "No se eligió ningún archivo"}
         </p>
 
+        {/* ACCIONES */}
         <div className="flex gap-2">
           <button
             onClick={handleUpload}
