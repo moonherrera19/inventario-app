@@ -1,76 +1,83 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { EstatusCompra } from "@prisma/client";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const { rows } = await req.json();
 
-    let inserted = 0;
-    let skipped = 0;
+    if (!Array.isArray(rows)) {
+      return NextResponse.json(
+        { error: "Formato inválido" },
+        { status: 400 }
+      );
+    }
+
+    let insertados = 0;
+    let ignorados = 0;
 
     for (const row of rows) {
       try {
-        if (!row.FOLIO || !row.TOTAL || !row.PROVEEDOR) {
-          skipped++;
+        const proveedorNombre = row.PROVEEDOR || row.PROVEDOR;
+        const folio = row.FOLIO;
+        const total = row.TOTAL;
+
+        if (!proveedorNombre || !folio || !total) {
+          ignorados++;
           continue;
         }
 
-        // 🔹 PROVEEDOR (crear si no existe)
-        const proveedorNombre = row.PROVEEDOR.toString().trim();
-
-        let proveedor = await prisma.proveedor.findFirst({
+        const proveedor = await prisma.proveedor.findFirst({
           where: {
             nombre: {
-              equals: proveedorNombre,
+              equals: proveedorNombre.toString().trim(),
               mode: "insensitive",
             },
           },
         });
 
         if (!proveedor) {
-          proveedor = await prisma.proveedor.create({
-            data: { nombre: proveedorNombre },
-          });
+          ignorados++;
+          continue;
         }
 
         await prisma.compraAdministrativa.create({
           data: {
             proveedorId: proveedor.id,
-            numeroFactura: row.FOLIO.toString(),
+            numeroFactura: folio.toString(),
             concepto: row.PRODUCTO || "SIN CONCEPTO",
-            monto: Number(row.TOTAL.toString().replace(/[$,]/g, "")),
             banco: row.BANCO || null,
             cuentaClabe: row["CUENTA/CLABE"] || null,
             empresa: row.EMPRESA || null,
             moneda: row.MONEDA || "MXN",
-            precio: row.PRECIO
-              ? Number(row.PRECIO.toString().replace(/[$,]/g, ""))
-              : null,
+            precio: row.PRECIO ? Number(row.PRECIO) : null,
+            monto: Number(total),
+            estatus: EstatusCompra.CAPTURADA,
             fechaFactura: row["FECHA EMISION"]
               ? new Date(row["FECHA EMISION"])
               : null,
-            fechaPago: null,
-            estatus: EstatusCompra.CAPTURADA, // 🔒 FORZADO
+            fechaPago: row["FECHA DEL PAGO"]
+              ? new Date(row["FECHA DEL PAGO"])
+              : null,
           },
         });
 
-        inserted++;
+        insertados++;
       } catch (err) {
         console.error("Fila ignorada:", row, err);
-        skipped++;
+        ignorados++;
       }
     }
 
     return NextResponse.json({
-      ok: true,
-      registrosInsertados: inserted,
-      registrosIgnorados: skipped,
+      message: "Carga masiva completada",
+      insertados,
+      ignorados,
     });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: "Error en carga masiva" },
+      { error: "Error al procesar el archivo" },
       { status: 500 }
     );
   }
