@@ -14,14 +14,16 @@ model Rol {
 }
 
 model Usuario {
-  id           Int                    @id @default(autoincrement())
-  nombre       String
-  correo       String                 @unique
-  password     String
-  rolId        Int
-  creadoEn     DateTime               @default(now())
-  comprasAdmin CompraAdministrativa[]
-  rol          Rol                    @relation(fields: [rolId], references: [id])
+  id       Int      @id @default(autoincrement())
+  nombre   String
+  correo   String   @unique
+  password String
+  rolId    Int
+  creadoEn DateTime @default(now())
+
+  comprasAdmin CompraAdministrativa[] // ✔ relación inversa OK
+
+  rol Rol @relation(fields: [rolId], references: [id])
 }
 
 model Categoria {
@@ -32,7 +34,7 @@ model Categoria {
 }
 
 model Proveedor {
-  id                  Int                    @id @default(autoincrement())
+  id                  Int     @id @default(autoincrement())
   nombre              String
   telefono            String?
   direccion           String?
@@ -44,9 +46,10 @@ model Proveedor {
   numeroCuenta        String?
   numeroCuentaDolares String?
   rfc                 String?
-  compras             Compra[]
-  comprasAdmin        CompraAdministrativa[]
-  productos           Producto[]
+
+  compras      Compra[]
+  comprasAdmin CompraAdministrativa[] // ✔ sigue existiendo
+  productos    Producto[]
 }
 
 model Producto {
@@ -56,13 +59,13 @@ model Producto {
   stock          Float    @default(0)
   stockMinimo    Float    @default(0)
   precioUnitario Float?
-  categoriaId    Int?
-  proveedorId    Int?
-
-  manejaLotes    Boolean  @default(false) // 👈 AGREGA ESTA LÍNEA
-
   creadoEn       DateTime @default(now())
   actualizadoEn  DateTime @updatedAt
+
+  categoriaId Int?
+  proveedorId Int?
+
+  manejaLotes Boolean @default(false)
 
   compras         Compra[]
   consumos        Consumo[]
@@ -75,55 +78,16 @@ model Producto {
   proveedor Proveedor? @relation(fields: [proveedorId], references: [id])
 }
 
-
-model InventarioLote {
-  id                 Int       @id @default(autoincrement())
-  productoId         Int
-  loteCodigo         String
-  fechaCaducidad     DateTime?
-  cantidadDisponible Float
-  fechaEntrada       DateTime  @default(now())
-  producto           Producto  @relation(fields: [productoId], references: [id])
-  salidas            Salida[]
-
-  @@index([productoId])
-}
-
-model Entrada {
-  id         Int      @id @default(autoincrement())
-  productoId Int
-  cantidad   Float
-  fecha      DateTime @default(now())
-  producto   Producto @relation(fields: [productoId], references: [id])
-}
-
-model Salida {
-  id               Int             @id @default(autoincrement())
-  productoId       Int
-  cantidad         Float
-  fecha            DateTime        @default(now())
-  cultivo          String?
-  rancho           String?
-  inventarioLoteId Int?
-  inventarioLote   InventarioLote? @relation(fields: [inventarioLoteId], references: [id])
-  producto         Producto        @relation(fields: [productoId], references: [id])
-}
-
-model Compra {
-  id          Int       @id @default(autoincrement())
-  productoId  Int
-  costo       Float
-  cantidad    Float
-  fecha       DateTime  @default(now())
-  proveedorId Int
-  producto    Producto  @relation(fields: [productoId], references: [id])
-  proveedor   Proveedor @relation(fields: [proveedorId], references: [id])
-}
-
 model CompraAdministrativa {
-  id            Int           @id @default(autoincrement())
-  proveedorId   Int
-  usuarioId     Int?
+  id Int @id @default(autoincrement())
+
+  // 🔹 PARA EXCEL
+  proveedorNombre String? // ← Excel manda esto
+
+  // 🔹 PARA RELACIONES FUTURAS
+  proveedorId Int?
+  usuarioId   Int?
+
   fechaFactura  DateTime?
   numeroFactura String?
   concepto      String
@@ -133,16 +97,66 @@ model CompraAdministrativa {
   observaciones String?
   creadoEn      DateTime      @default(now())
   actualizadoEn DateTime      @updatedAt
-  banco         String?
-  cuentaClabe   String?
-  empresa       String?
-  moneda        String        @default("MXN")
-  precio        Float?
-  proveedor     Proveedor     @relation(fields: [proveedorId], references: [id])
-  usuario       Usuario?      @relation(fields: [usuarioId], references: [id])
+
+  banco       String?
+  cuentaClabe String?
+  empresa     String?
+  moneda      String  @default("MXN")
+  precio      Float?
+
+  proveedor Proveedor? @relation(fields: [proveedorId], references: [id])
+  usuario   Usuario?   @relation(fields: [usuarioId], references: [id])
 
   @@index([estatus])
   @@index([proveedorId])
+}
+
+model InventarioLote {
+  id                 Int       @id @default(autoincrement())
+  productoId         Int
+  loteCodigo         String
+  fechaCaducidad     DateTime?
+  cantidadDisponible Float
+  fechaEntrada       DateTime  @default(now())
+
+  producto Producto @relation(fields: [productoId], references: [id])
+  salidas  Salida[]
+
+  @@index([productoId])
+}
+
+model Entrada {
+  id         Int      @id @default(autoincrement())
+  productoId Int
+  cantidad   Float
+  fecha      DateTime @default(now())
+
+  producto Producto @relation(fields: [productoId], references: [id])
+}
+
+model Salida {
+  id               Int      @id @default(autoincrement())
+  productoId       Int
+  cantidad         Float
+  fecha            DateTime @default(now())
+  cultivo          String?
+  rancho           String?
+  inventarioLoteId Int?
+
+  inventarioLote InventarioLote? @relation(fields: [inventarioLoteId], references: [id])
+  producto       Producto        @relation(fields: [productoId], references: [id])
+}
+
+model Compra {
+  id          Int      @id @default(autoincrement())
+  productoId  Int
+  costo       Float
+  cantidad    Float
+  fecha       DateTime @default(now())
+  proveedorId Int
+
+  producto  Producto  @relation(fields: [productoId], references: [id])
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id])
 }
 
 model Receta {
@@ -152,12 +166,13 @@ model Receta {
 }
 
 model Ingrediente {
-  id         Int      @id @default(autoincrement())
+  id         Int   @id @default(autoincrement())
   recetaId   Int
   productoId Int
   cantidad   Float
-  producto   Producto @relation(fields: [productoId], references: [id])
-  receta     Receta   @relation(fields: [recetaId], references: [id])
+
+  producto Producto @relation(fields: [productoId], references: [id])
+  receta   Receta   @relation(fields: [recetaId], references: [id])
 }
 
 model Lote {
@@ -174,8 +189,9 @@ model Consumo {
   productoId Int
   cantidad   Float
   fecha      DateTime @default(now())
-  lote       Lote     @relation(fields: [loteId], references: [id])
-  producto   Producto @relation(fields: [productoId], references: [id])
+
+  lote     Lote     @relation(fields: [loteId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
 }
 
 enum EstatusCompra {
