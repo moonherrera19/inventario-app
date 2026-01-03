@@ -119,15 +119,16 @@ export default function ComprasAdminPage() {
   // ===============================
   // EXPORTAR EXCEL
   // ===============================
-  const exportarExcel = () => {
-    const data = comprasFiltradas.map(c => ({
-      Proveedor: c.proveedor.nombre,
-      Empresa: c.empresa,
-      Folio: c.numeroFactura,
-      Fecha: c.fechaFactura?.slice(0, 10),
-      Total: c.monto,
-      Estatus: c.estatus,
-    }));
+const exportarExcel = () => {
+  const data = comprasFiltradas.map(c => ({
+    Proveedor: c.proveedor?.nombre || "SIN PROVEEDOR",
+    Empresa: c.empresa,
+    Folio: c.numeroFactura,
+    Fecha: c.fechaFactura?.slice(0, 10),
+    Total: c.monto,
+    Estatus: c.estatus,
+  }));
+
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
