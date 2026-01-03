@@ -28,17 +28,19 @@ export default function ModalCargaMasiva({
     setLoading(true);
 
     try {
-      // 📄 Leer Excel
+      // 1️⃣ Leer Excel
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
       const rows = XLSX.utils.sheet_to_json(sheet, {
         defval: "",
-        raw: false, // 🔑 respeta fechas y números
+        raw: false,
       });
 
-      // 🚀 ENVIAR A LA RUTA CORRECTA
+      console.log("📄 Filas leídas del Excel:", rows.length);
+
+      // 2️⃣ Enviar al backend
       const res = await fetch("/api/compras-admin", {
         method: "POST",
         headers: {
@@ -47,21 +49,32 @@ export default function ModalCargaMasiva({
         body: JSON.stringify({ rows }),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        console.error("Error backend:", err);
-        throw new Error("Error en la carga");
+      // 🔴 AQUÍ ESTABA EL PROBLEMA: ahora sí leemos la respuesta
+      const data = await res.json();
+      console.log("📦 Respuesta backend:", data);
+
+      if (!res.ok || !data.ok) {
+        alert("❌ Error en la carga masiva");
+        return;
       }
 
-      // ✅ refrescar tabla
+      // 3️⃣ MENSAJE CLARO AL USUARIO
+      alert(
+        `✅ Carga masiva completada\n\n` +
+        `Total filas: ${data.resumen.totalFilas}\n` +
+        `Insertadas: ${data.resumen.insertados}\n` +
+        `Ignoradas: ${data.resumen.ignorados}`
+      );
+
+      // 4️⃣ Refrescar tabla
       onSuccess();
 
-      // 🧹 limpiar y cerrar
+      // 5️⃣ Limpiar y cerrar
       setFile(null);
       onClose();
     } catch (error) {
-      console.error(error);
-      alert("Error al procesar el archivo");
+      console.error("❌ Error modal carga masiva:", error);
+      alert("Error inesperado al procesar el archivo");
     } finally {
       setLoading(false);
     }
@@ -74,7 +87,6 @@ export default function ModalCargaMasiva({
           Carga masiva (Excel)
         </h2>
 
-        {/* INPUT REAL */}
         <input
           id="file-upload"
           type="file"
@@ -83,7 +95,6 @@ export default function ModalCargaMasiva({
           className="hidden"
         />
 
-        {/* BOTÓN */}
         <label
           htmlFor="file-upload"
           className="inline-block bg-gray-700 px-4 py-2 rounded text-white cursor-pointer mb-3"
@@ -91,14 +102,12 @@ export default function ModalCargaMasiva({
           Elegir archivo
         </label>
 
-        {/* INFO */}
         <p className="text-sm mb-4 text-gray-300">
           {file
             ? `Archivo seleccionado: ${file.name}`
             : "No se eligió ningún archivo"}
         </p>
 
-        {/* ACCIONES */}
         <div className="flex gap-2">
           <button
             onClick={handleUpload}
