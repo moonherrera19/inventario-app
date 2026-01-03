@@ -23,7 +23,7 @@ export async function GET() {
 }
 
 // ===============================
-// POST → CARGA MASIVA EXCEL (SIN VALIDAR, SIN RELACIONES)
+// POST → CARGA MASIVA (INSERTA TODO, SIN RELACIONES)
 // ===============================
 export async function POST(req: NextRequest) {
   try {
@@ -43,6 +43,9 @@ export async function POST(req: NextRequest) {
       try {
         await prisma.compraAdministrativa.create({
           data: {
+            // 🔑 CLAVE: forzar proveedorId null
+            proveedorId: null,
+
             proveedorNombre: String(
               row["PROVEDOR:"] ??
               row["PROVEEDOR"] ??
