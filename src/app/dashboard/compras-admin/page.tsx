@@ -11,15 +11,24 @@ const ESTATUS = ["CAPTURADA", "APROBADA", "PAGADA"] as const;
 
 type Compra = {
   id: number;
-  numeroFactura?: string;
+  numeroFactura?: string | null;
   concepto: string;
   monto: number;
   estatus: "CAPTURADA" | "APROBADA" | "PAGADA";
-  fechaFactura?: string;
-  fechaPago?: string;
-  empresa?: string;
-  proveedor: { nombre: string };
+
+  banco?: string | null;
+  cuentaClabe?: string | null;
+  moneda?: string | null;
+
+  fechaFactura?: string | null;
+  fechaPago?: string | null;
+  empresa?: string | null;
+
+  proveedor?: {
+    nombre: string;
+  } | null;
 };
+
 
 export default function ComprasAdminPage() {
   const [compras, setCompras] = useState<Compra[]>([]);
