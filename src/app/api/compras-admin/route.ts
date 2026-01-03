@@ -1,3 +1,30 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { EstatusCompra } from "@prisma/client";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+// ===============================
+// GET → listar compras
+// ===============================
+export async function GET() {
+  try {
+    const compras = await prisma.compraAdministrativa.findMany({
+      orderBy: { creadoEn: "desc" },
+    });
+
+    return NextResponse.json({ compras });
+  } catch (error) {
+    console.error("GET compras-admin:", error);
+    return NextResponse.json({ error: "Error GET" }, { status: 500 });
+  }
+}
+
+// ===============================
+// POST → CARGA MASIVA EXCEL (SIN VALIDAR, SIN RELACIONES)
+// ===============================
 export async function POST(req: NextRequest) {
   try {
     const { rows } = await req.json();
