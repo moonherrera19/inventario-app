@@ -35,11 +35,11 @@ export default function ModalCargaMasiva({
 
       const rows = XLSX.utils.sheet_to_json(sheet, {
         defval: "",
-        raw: false, // 🔑 CLAVE para fechas y números
+        raw: false, // 🔑 respeta fechas y números
       });
 
-      // 🚀 Enviar al backend (RUTA CORRECTA)
-      const res = await fetch("/api/compras-admin/carga-masiva", {
+      // 🚀 ENVIAR A LA RUTA CORRECTA
+      const res = await fetch("/api/compras-admin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -53,10 +53,10 @@ export default function ModalCargaMasiva({
         throw new Error("Error en la carga");
       }
 
-      // ✅ Refrescar datos
+      // ✅ refrescar tabla
       onSuccess();
 
-      // 🧹 Limpiar y cerrar
+      // 🧹 limpiar y cerrar
       setFile(null);
       onClose();
     } catch (error) {
