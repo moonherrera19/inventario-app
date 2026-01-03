@@ -228,25 +228,73 @@ export default function ComprasAdminPage() {
         <div className="overflow-auto max-h-[420px]">
           <table className="w-full text-sm">
             <thead className="text-green-300">
-              <tr>
-                <th>Proveedor</th>
-                <th>Empresa</th>
-                <th>Folio</th>
-                <th>Fecha</th>
-                <th>Total</th>
-                <th>Estatus</th>
-              </tr>
+                <tr>
+    <th className="px-2 py-2">Folio</th>
+    <th className="px-2 py-2">Proveedor</th>
+    <th className="px-2 py-2">Banco</th>
+    <th className="px-2 py-2">Cuenta / CLABE</th>
+    <th className="px-2 py-2 text-right">Total</th>
+    <th className="px-2 py-2">Fecha emisión</th>
+    <th className="px-2 py-2">Producto</th>
+    <th className="px-2 py-2 text-right">Precio</th>
+    <th className="px-2 py-2">Moneda</th>
+    <th className="px-2 py-2">Empresa</th>
+    <th className="px-2 py-2">Estatus</th>
+    <th className="px-2 py-2">Fecha del pago</th>
+  </tr>
             </thead>
             <tbody>
               {comprasFiltradas.map(c => (
-                <tr key={c.id} className="border-t border-white/10">
-                  <td>{c.proveedor.nombre}</td>
-                  <td>{c.empresa}</td>
-                  <td>{c.numeroFactura}</td>
-                  <td>{c.fechaFactura?.slice(0, 10)}</td>
-                  <td>${c.monto.toFixed(2)}</td>
-                  <td>{c.estatus}</td>
-                </tr>
+                 <tr
+      key={c.id}
+      className="border-t border-white/10 hover:bg-white/5"
+    >
+      <td className="px-2 py-1">{c.numeroFactura || "—"}</td>
+
+      <td className="px-2 py-1">
+        {c.proveedor?.nombre || "SIN PROVEEDOR"}
+      </td>
+
+      <td className="px-2 py-1">{c.banco || "—"}</td>
+
+      <td className="px-2 py-1">{c.cuentaClabe || "—"}</td>
+
+      <td className="px-2 py-1 text-right font-semibold">
+        ${c.monto.toFixed(2)}
+      </td>
+
+      <td className="px-2 py-1">
+        {c.fechaFactura?.slice(0, 10) || "—"}
+      </td>
+
+      <td className="px-2 py-1">{c.concepto}</td>
+
+      <td className="px-2 py-1 text-right">
+        ${c.monto.toFixed(2)}
+      </td>
+
+      <td className="px-2 py-1">{c.moneda || "MXN"}</td>
+
+      <td className="px-2 py-1">{c.empresa || "—"}</td>
+
+      <td className="px-2 py-1">
+        <span
+          className={`px-2 py-1 rounded text-xs font-semibold ${
+            c.estatus === "CAPTURADA"
+              ? "bg-yellow-500/20 text-yellow-400"
+              : c.estatus === "APROBADA"
+              ? "bg-blue-500/20 text-blue-400"
+              : "bg-green-500/20 text-green-400"
+          }`}
+        >
+          {c.estatus}
+        </span>
+      </td>
+
+      <td className="px-2 py-1">
+        {c.fechaPago?.slice(0, 10) || "—"}
+      </td>
+    </tr>
               ))}
             </tbody>
           </table>
