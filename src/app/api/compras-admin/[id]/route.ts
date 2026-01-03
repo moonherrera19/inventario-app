@@ -4,11 +4,13 @@ import { EstatusCompra } from "@prisma/client";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await context.params;
     const { estatus } = await req.json();
-    const compraId = Number(params.id);
+
+    const compraId = Number(id);
 
     if (!compraId || !estatus) {
       return NextResponse.json(
@@ -17,11 +19,11 @@ export async function PATCH(
       );
     }
 
-    // Reglas de negocio
     const dataUpdate: any = {
       estatus,
     };
 
+    // 🔥 Fecha automática solo cuando pasa a PAGADA
     if (estatus === EstatusCompra.PAGADA) {
       dataUpdate.fechaPago = new Date();
     }
