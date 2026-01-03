@@ -58,10 +58,12 @@ export default function ComprasAdminPage() {
   // CARGAR COMPRAS
   // ===============================
   const fetchCompras = async () => {
-    const res = await fetch("/api/compras-admin");
-    const data = await res.json();
-    setCompras(data.compras || []);
-  };
+  const res = await fetch("/api/compras-admin", {
+    cache: "no-store",
+  });
+  const data = await res.json();
+  setCompras(data.compras || []);
+};
 
   useEffect(() => {
     fetchCompras();
