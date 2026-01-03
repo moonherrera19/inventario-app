@@ -33,7 +33,7 @@ export default function ModalCargaMasiva({
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-      const res = await fetch("/admin/compras-admin/carga-masiva", {
+      const res = await fetch("/api/compras-admin/carga-masiva", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows }),
@@ -61,7 +61,6 @@ export default function ModalCargaMasiva({
           Carga masiva (Excel)
         </h2>
 
-        {/* INPUT REAL OCULTO */}
         <input
           id="file-upload"
           type="file"
@@ -70,7 +69,6 @@ export default function ModalCargaMasiva({
           className="hidden"
         />
 
-        {/* BOTÓN QUE ABRE EL EXPLORADOR */}
         <label
           htmlFor="file-upload"
           className="inline-block bg-gray-700 px-4 py-2 rounded text-white cursor-pointer mb-3"
@@ -78,12 +76,12 @@ export default function ModalCargaMasiva({
           Elegir archivo
         </label>
 
-        {/* NOMBRE DEL ARCHIVO */}
         <p className="text-sm mb-4 text-gray-300">
-          {file ? `Archivo seleccionado: ${file.name}` : "No se eligió ningún archivo"}
+          {file
+            ? `Archivo seleccionado: ${file.name}`
+            : "No se eligió ningún archivo"}
         </p>
 
-        {/* BOTONES */}
         <div className="flex gap-2">
           <button
             onClick={handleUpload}
