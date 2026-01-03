@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import ModalCargaMasiva from "@/components/modals/ModalCargaMasiva";
 
 const EMPRESAS = ["H&C", "BERRIES BEST", "HACHERA", "4BERRIES"];
 const ESTATUS = ["CAPTURADA", "APROBADA", "PAGADA"] as const;
@@ -47,6 +48,11 @@ export default function ComprasAdminPage() {
     concepto: "",
     total: "",
   });
+
+  // ===============================
+  // CARGA MASIVA
+  // ===============================
+  const [openCargaMasiva, setOpenCargaMasiva] = useState(false);
 
   // ===============================
   // CARGAR COMPRAS
@@ -116,41 +122,7 @@ export default function ComprasAdminPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Compras");
     XLSX.writeFile(wb, "reporte_compras.xlsx");
-    
   };
-   // ===============================
-  // CARGA MASIVA DESDE EXCEL ✅ (ESTO FALTABA)
-  // ===============================
-  const manejarCargaMasiva = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer);
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows: any[] = XLSX.utils.sheet_to_json(sheet);
-
-    for (const row of rows) {
-      await fetch("/api/compras-admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          proveedorId: row.proveedorId,
-          empresa: row.empresa,
-          folio: row.folio,
-          concepto: row.concepto,
-          total: row.total,
-          banco: row.banco || tipoBanco,
-        }),
-      });
-    }
-
-    fetchCompras();
-    alert("Carga masiva completada");
-  };
-
 
   // ===============================
   // EXPORTAR PDF
@@ -223,15 +195,12 @@ export default function ComprasAdminPage() {
         <button onClick={() => setMostrarFormulario(true)} className="bg-blue-600 px-4 py-2 rounded font-semibold">
           Registrar factura
         </button>
-        <label className="bg-purple-600 px-4 py-2 rounded font-semibold cursor-pointer">
-  Carga masiva (Excel)
-  <input
-    type="file"
-    accept=".xlsx,.xls"
-    className="hidden"
-    onChange={e => manejarCargaMasiva(e)}
-  />
-</label>
+        <button
+          onClick={() => setOpenCargaMasiva(true)}
+          className="bg-purple-600 px-4 py-2 rounded font-semibold"
+        >
+          Carga masiva (Excel)
+        </button>
       </div>
 
       {/* TOTALES */}
@@ -282,100 +251,12 @@ export default function ComprasAdminPage() {
         </div>
       </div>
 
-      {/* MODAL REGISTRAR FACTURA */}
-      {mostrarFormulario && (
-        <div className="fixed inset-0 bg-black/70 flex justify-end z-50">
-          <div className="w-full max-w-md bg-[#111319] p-6 overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">Registrar factura</h2>
-
-            <select className="bg-black p-2 rounded w-full mb-3" value={tipoBanco}
-              onChange={e => {
-                setTipoBanco(e.target.value as any);
-                setProveedorSeleccionado(null);
-                setFormFactura({ ...formFactura, proveedorId: "" });
-              }}
-            >
-              <option value="MX">Banco MX</option>
-              <option value="USA">Banco USA</option>
-            </select>
-
-            <select className="bg-black p-2 rounded w-full mb-3"
-              value={formFactura.proveedorId}
-              onChange={e => {
-                const id = e.target.value;
-                setFormFactura({ ...formFactura, proveedorId: id });
-                setProveedorSeleccionado(proveedores.find(p => String(p.id) === id) || null);
-              }}
-            >
-              <option value="">Proveedor</option>
-              {proveedores.map(p => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
-            </select>
-
-            {proveedorSeleccionado && (
-  <div className="bg-black/40 p-3 rounded mb-3 text-sm space-y-2">
-    <div>
-      <p className="text-gray-400">Banco</p>
-      <p className="font-semibold">{proveedorSeleccionado.banco}</p>
-    </div>
-
-    <div>
-      <p className="text-gray-400">Clave banco</p>
-      <p className="font-semibold">{proveedorSeleccionado.claveBanco}</p>
-    </div>
-
-    <div>
-      <p className="text-gray-400">Cuenta / CLABE</p>
-      <p className="font-semibold">{proveedorSeleccionado.cuenta}</p>
-    </div>
-  </div>
-)}
-
-
-            <select className="bg-black p-2 rounded w-full mb-3"
-              value={formFactura.empresa}
-              onChange={e => setFormFactura({ ...formFactura, empresa: e.target.value })}
-            >
-              <option value="">Empresa</option>
-              {EMPRESAS.map(e => <option key={e} value={e}>{e}</option>)}
-            </select>
-
-            <input className="bg-black p-2 rounded w-full mb-3" placeholder="Folio"
-              value={formFactura.folio}
-              onChange={e => setFormFactura({ ...formFactura, folio: e.target.value })}
-            />
-
-            <input className="bg-black p-2 rounded w-full mb-3" placeholder="Concepto"
-              value={formFactura.concepto}
-              onChange={e => setFormFactura({ ...formFactura, concepto: e.target.value })}
-            />
-
-            <input type="number" className="bg-black p-2 rounded w-full mb-4" placeholder="Total"
-              value={formFactura.total}
-              onChange={e => setFormFactura({ ...formFactura, total: e.target.value })}
-            />
-
-            <button className="bg-blue-600 w-full py-2 rounded font-semibold"
-              onClick={async () => {
-                await fetch("/api/compras-admin", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ ...formFactura, banco: tipoBanco }),
-                });
-                setMostrarFormulario(false);
-                fetchCompras();
-              }}
-            >
-              Guardar factura
-            </button>
-
-            <button className="text-gray-400 mt-4 w-full" onClick={() => setMostrarFormulario(false)}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
+      {/* MODAL CARGA MASIVA */}
+      <ModalCargaMasiva
+        open={openCargaMasiva}
+        onClose={() => setOpenCargaMasiva(false)}
+        onSuccess={fetchCompras}
+      />
     </div>
   );
 }
