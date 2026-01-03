@@ -18,19 +18,26 @@ export async function POST(req: Request) {
 
     for (const row of rows) {
       try {
-        const proveedorNombre = row.PROVEEDOR || row.PROVEDOR;
-        const folio = row.FOLIO;
-        const total = row.TOTAL;
+        // ============================
+        // VALIDACIONES MÍNIMAS
+        // ============================
+        const proveedorNombre =
+          row.PROVEEDOR || row.PROVEDOR || null;
+        const folio = row.FOLIO || null;
+        const totalRaw = row.TOTAL || null;
 
-        if (!proveedorNombre || !folio || !total) {
+        if (!proveedorNombre || !folio || !totalRaw) {
           ignorados++;
           continue;
         }
 
+        // ============================
+        // BUSCAR PROVEEDOR
+        // ============================
         const proveedor = await prisma.proveedor.findFirst({
           where: {
             nombre: {
-              equals: proveedorNombre.toString().trim(),
+              equals: String(proveedorNombre).trim(),
               mode: "insensitive",
             },
           },
@@ -41,24 +48,58 @@ export async function POST(req: Request) {
           continue;
         }
 
+        // ============================
+        // MONTO (ÚNICO NÚMERO)
+        // ============================
+        const monto = Number(
+          String(totalRaw).replace(/[$,]/g, "")
+        );
+
+        if (isNaN(monto)) {
+          ignorados++;
+          continue;
+        }
+
+        // ============================
+        // CREATE (TODO STRING / NULL)
+        // ============================
         await prisma.compraAdministrativa.create({
           data: {
             proveedorId: proveedor.id,
-            numeroFactura: folio.toString(),
-            concepto: row.PRODUCTO || "SIN CONCEPTO",
-            banco: row.BANCO || null,
-            cuentaClabe: row["CUENTA/CLABE"] || null,
-            empresa: row.EMPRESA || null,
-            moneda: row.MONEDA || "MXN",
-            precio: row.PRECIO ? Number(row.PRECIO) : null,
-            monto: Number(total),
+
+            numeroFactura: String(folio),
+
+            concepto: row.PRODUCTO
+              ? String(row.PRODUCTO)
+              : "SIN CONCEPTO",
+
+            banco: row.BANCO
+              ? String(row.BANCO)
+              : null,
+
+            cuentaClabe: row["CUENTA/CLABE"]
+              ? String(row["CUENTA/CLABE"])
+              : null,
+
+            empresa: row.EMPRESA
+              ? String(row.EMPRESA)
+              : null,
+
+            moneda: row.MONEDA
+              ? String(row.MONEDA)
+              : "MXN",
+
+            // ❌ NO convertir precio
+            precio: null,
+
+            // ✅ SOLO MONTO NUMÉRICO
+            monto,
+
             estatus: EstatusCompra.CAPTURADA,
-            fechaFactura: row["FECHA EMISION"]
-              ? new Date(row["FECHA EMISION"])
-              : null,
-            fechaPago: row["FECHA DEL PAGO"]
-              ? new Date(row["FECHA DEL PAGO"])
-              : null,
+
+            // ❌ NO fechas
+            fechaFactura: null,
+            fechaPago: null,
           },
         });
 
@@ -75,7 +116,7 @@ export async function POST(req: Request) {
       ignorados,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error general:", error);
     return NextResponse.json(
       { error: "Error al procesar el archivo" },
       { status: 500 }
