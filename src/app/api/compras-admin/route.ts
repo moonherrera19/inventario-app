@@ -1,29 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { EstatusCompra } from "@prisma/client";
-import * as XLSX from "xlsx";
-
-/**
- * ⛔ MUY IMPORTANTE
- * Evita cacheo en App Router (Vercel / producción)
- */
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { EstatusCompra } from "@prisma/client";
+
 // ======================================================
-// GET → listar compras + totales
+// GET → listar compras + totales (SIN CACHE)
 // ======================================================
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url);
-    const estatusParam = searchParams.get("estatus");
-
-    const where = estatusParam
-      ? { estatus: estatusParam as EstatusCompra }
-      : {};
-
     const compras = await prisma.compraAdministrativa.findMany({
-      where,
       include: { proveedor: true },
       orderBy: { creadoEn: "desc" },
     });
@@ -38,7 +26,7 @@ export async function GET(req: NextRequest) {
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
-    console.error(error);
+    console.error("GET compras-admin:", error);
     return NextResponse.json(
       { error: "Error al obtener compras administrativas" },
       { status: 500 }
@@ -47,21 +35,22 @@ export async function GET(req: NextRequest) {
 }
 
 // ======================================================
-// POST → crear compra manual O importar Excel
+// POST → carga masiva (JSON rows) O alta manual
 // ======================================================
 export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get("content-type") || "";
 
-    // ==================================================
-    // 🔹 IMPORTAR EXCEL DESDE MODAL (JSON rows)
-    // ==================================================
+    // ================================================
+    // 🔹 CARGA MASIVA DESDE EXCEL (JSON)
+// ================================================
     if (contentType.includes("application/json")) {
-      const { rows } = await req.json();
+      const body = await req.json();
+      const rows = body.rows;
 
       if (!Array.isArray(rows)) {
         return NextResponse.json(
-          { error: "Formato inválido" },
+          { error: "Formato inválido, rows no es array" },
           { status: 400 }
         );
       }
@@ -71,10 +60,14 @@ export async function POST(req: NextRequest) {
 
       for (const row of rows) {
         try {
-          const proveedorNombre =
-            row.PROVEEDOR || row.PROVEDOR || row.proveedor;
+          const proveedorNombre = String(
+            row.PROVEEDOR || row.PROVEDOR || ""
+          ).trim();
 
-          if (!proveedorNombre || !row.FOLIO || !row.TOTAL) {
+          const folio = String(row.FOLIO || "").trim();
+          const totalRaw = String(row.TOTAL || "").replace(/[$,]/g, "");
+
+          if (!proveedorNombre || !folio || !totalRaw) {
             ignorados++;
             continue;
           }
@@ -82,7 +75,7 @@ export async function POST(req: NextRequest) {
           const proveedor = await prisma.proveedor.findFirst({
             where: {
               nombre: {
-                equals: proveedorNombre.toString().trim(),
+                equals: proveedorNombre,
                 mode: "insensitive",
               },
             },
@@ -93,12 +86,14 @@ export async function POST(req: NextRequest) {
             continue;
           }
 
-          const monto = Number(
-            row.TOTAL.toString().replace(/[$,]/g, "")
-          );
+          const monto = Number(totalRaw);
+          if (isNaN(monto)) {
+            ignorados++;
+            continue;
+          }
 
           const precio = row.PRECIO
-            ? Number(row.PRECIO.toString().replace(/[$,]/g, ""))
+            ? Number(String(row.PRECIO).replace(/[$,]/g, ""))
             : null;
 
           const fechaFactura = row["FECHA EMISION"]
@@ -112,12 +107,14 @@ export async function POST(req: NextRequest) {
           await prisma.compraAdministrativa.create({
             data: {
               proveedorId: proveedor.id,
-              numeroFactura: row.FOLIO.toString(),
-              banco: row.BANCO || null,
-              cuentaClabe: row["CUENTA/CLABE"] || null,
-              empresa: row.EMPRESA || null,
-              moneda: row.MONEDA || "MXN",
-              concepto: row.PRODUCTO || "SIN CONCEPTO",
+              numeroFactura: folio,
+              concepto: String(row.PRODUCTO || "SIN CONCEPTO"),
+              banco: row.BANCO ? String(row.BANCO) : null,
+              cuentaClabe: row["CUENTA/CLABE"]
+                ? String(row["CUENTA/CLABE"])
+                : null,
+              empresa: row.EMPRESA ? String(row.EMPRESA) : null,
+              moneda: row.MONEDA ? String(row.MONEDA) : "MXN",
               precio,
               monto,
               fechaFactura,
@@ -140,9 +137,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ==================================================
-    // 🔹 CREAR FACTURA MANUAL
-    // ==================================================
+    // ================================================
+    // 🔹 ALTA MANUAL
+    // ================================================
     const body = await req.json();
 
     const compra = await prisma.compraAdministrativa.create({
@@ -167,7 +164,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(compra);
   } catch (error) {
-    console.error(error);
+    console.error("POST compras-admin:", error);
     return NextResponse.json(
       { error: "Error al procesar la solicitud" },
       { status: 500 }
@@ -206,7 +203,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json(compra);
   } catch (error) {
-    console.error(error);
+    console.error("PATCH compras-admin:", error);
     return NextResponse.json(
       { error: "Error al actualizar estatus" },
       { status: 500 }
