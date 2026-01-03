@@ -4,11 +4,11 @@ export const revalidate = 0;
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { EstatusCompra } from "@prisma/client";
+import { EstatusCompra, Prisma } from "@prisma/client";
 
-// ======================================================
-// GET → listar compras
-// ======================================================
+// ============================
+// GET
+// ============================
 export async function GET() {
   try {
     const compras = await prisma.compraAdministrativa.findMany({
@@ -22,18 +22,15 @@ export async function GET() {
   }
 }
 
-// ======================================================
-// POST → CARGA MASIVA (SUBE TODO, SIN VALIDAR NADA)
-// ======================================================
+// ============================
+// POST – CARGA MASIVA DIRECTA
+// ============================
 export async function POST(req: NextRequest) {
   try {
     const { rows } = await req.json();
 
     if (!Array.isArray(rows)) {
-      return NextResponse.json(
-        { error: "rows no es array" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "rows no es array" }, { status: 400 });
     }
 
     let insertados = 0;
@@ -41,46 +38,35 @@ export async function POST(req: NextRequest) {
 
     for (const row of rows) {
       try {
-        await prisma.compraAdministrativa.create({
-          data: {
-            // 🔹 EXACTAMENTE COMO VIENE DEL EXCEL
-            proveedorNombre: String(
-              row["PROVEDOR:"] ??
-              row["PROVEEDOR"] ??
-              ""
-            ).trim(),
+        const data: Prisma.CompraAdministrativaUncheckedCreateInput = {
+          proveedorNombre: String(
+            row["PROVEDOR:"] ??
+            row["PROVEEDOR"] ??
+            ""
+          ).trim() || null,
 
-            numeroFactura: String(row["FOLIO"] ?? "").trim(),
+          numeroFactura: String(row["FOLIO"] ?? "").trim() || null,
 
-            concepto: String(row["PRODUCTO"] ?? "SIN CONCEPTO"),
+          concepto: String(row["PRODUCTO"] ?? "SIN CONCEPTO"),
 
-            banco: row["BANCO:"] ? String(row["BANCO:"]) : null,
+          banco: row["BANCO:"] ? String(row["BANCO:"]) : null,
+          cuentaClabe: row["CUENTA/CLABE:"] ? String(row["CUENTA/CLABE:"]) : null,
+          empresa: row["EMPRESA:"] ? String(row["EMPRESA:"]) : null,
 
-            cuentaClabe: row["CUENTA/CLABE:"] 
-              ? String(row["CUENTA/CLABE:"]) 
-              : null,
+          moneda: row["MONEDA:"] ? String(row["MONEDA:"]) : "MXN",
 
-            empresa: row["EMPRESA:"] 
-              ? String(row["EMPRESA:"]) 
-              : null,
+          monto: Number(
+            String(row["TOTAL:"] ?? row["TOTAL"] ?? "0").replace(/[$,]/g, "")
+          ),
 
-            moneda: row["MONEDA:"] 
-              ? String(row["MONEDA:"]) 
-              : "MXN",
+          estatus: EstatusCompra.CAPTURADA,
+        };
 
-            monto: Number(
-              String(row["TOTAL:"] ?? row["TOTAL"] ?? 0)
-                .replace(/[$,]/g, "")
-            ) || 0,
-
-            estatus: EstatusCompra.CAPTURADA,
-          } as any, // 🔑 ESTA LÍNEA ES LA CLAVE
-        });
-
+        await prisma.compraAdministrativa.create({ data });
         insertados++;
       } catch (err) {
-        fallidos++;
         console.error("Fila fallida:", row, err);
+        fallidos++;
       }
     }
 
