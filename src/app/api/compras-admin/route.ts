@@ -23,7 +23,7 @@ export async function GET() {
 }
 
 // ======================================================
-// POST → CARGA MASIVA SIN VALIDACIONES
+// POST → CARGA MASIVA (SUBE TODO, SIN VALIDAR NADA)
 // ======================================================
 export async function POST(req: NextRequest) {
   try {
@@ -37,11 +37,13 @@ export async function POST(req: NextRequest) {
     }
 
     let insertados = 0;
+    let fallidos = 0;
 
     for (const row of rows) {
       try {
         await prisma.compraAdministrativa.create({
           data: {
+            // 🔹 EXACTAMENTE COMO VIENE DEL EXCEL
             proveedorNombre: String(
               row["PROVEDOR:"] ??
               row["PROVEEDOR"] ??
@@ -54,16 +56,16 @@ export async function POST(req: NextRequest) {
 
             banco: row["BANCO:"] ? String(row["BANCO:"]) : null,
 
-            cuentaClabe: row["CUENTA/CLABE:"]
-              ? String(row["CUENTA/CLABE:"])
+            cuentaClabe: row["CUENTA/CLABE:"] 
+              ? String(row["CUENTA/CLABE:"]) 
               : null,
 
-            empresa: row["EMPRESA:"]
-              ? String(row["EMPRESA:"])
+            empresa: row["EMPRESA:"] 
+              ? String(row["EMPRESA:"]) 
               : null,
 
-            moneda: row["MONEDA:"]
-              ? String(row["MONEDA:"])
+            moneda: row["MONEDA:"] 
+              ? String(row["MONEDA:"]) 
               : "MXN",
 
             monto: Number(
@@ -72,11 +74,12 @@ export async function POST(req: NextRequest) {
             ) || 0,
 
             estatus: EstatusCompra.CAPTURADA,
-          },
+          } as any, // 🔑 ESTA LÍNEA ES LA CLAVE
         });
 
         insertados++;
       } catch (err) {
+        fallidos++;
         console.error("Fila fallida:", row, err);
       }
     }
@@ -85,6 +88,7 @@ export async function POST(req: NextRequest) {
       ok: true,
       total: rows.length,
       insertados,
+      fallidos,
     });
   } catch (error) {
     console.error("POST compras-admin:", error);
