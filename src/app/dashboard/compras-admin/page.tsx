@@ -73,6 +73,35 @@ export default function ComprasAdminPage() {
   const data = await res.json();
   setCompras(data.compras || []);
 };
+// ===============================
+// CAMBIAR ESTATUS (APROBAR / PAGAR)
+// ===============================
+const cambiarEstatus = async (
+  id: number,
+  nuevoEstatus: "APROBADA" | "PAGADA"
+) => {
+  const confirmar = confirm(
+    `¿Seguro que deseas marcar esta compra como ${nuevoEstatus}?`
+  );
+
+  if (!confirmar) return;
+
+  const res = await fetch(`/api/compras-admin/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ estatus: nuevoEstatus }),
+  });
+
+  if (!res.ok) {
+    alert("Error al cambiar estatus");
+    return;
+  }
+
+  fetchCompras(); // refresca tabla y totales
+};
+
 
   useEffect(() => {
     fetchCompras();
@@ -252,6 +281,8 @@ const exportarExcel = () => {
     <th className="px-2 py-2">Empresa</th>
     <th className="px-2 py-2">Estatus</th>
     <th className="px-2 py-2">Fecha del pago</th>
+    <th className="px-2 py-2">Acciones</th>
+
   </tr>
             </thead>
             <tbody>
@@ -305,6 +336,32 @@ const exportarExcel = () => {
       <td className="px-2 py-1">
         {c.fechaPago?.slice(0, 10) || "—"}
       </td>
+      <td className="px-2 py-1">
+  {c.estatus === "CAPTURADA" && (
+    <button
+      onClick={() => cambiarEstatus(c.id, "APROBADA")}
+      className="bg-blue-600 px-2 py-1 rounded text-xs"
+    >
+      Aprobar
+    </button>
+  )}
+
+  {c.estatus === "APROBADA" && (
+    <button
+      onClick={() => cambiarEstatus(c.id, "PAGADA")}
+      className="bg-green-600 px-2 py-1 rounded text-xs"
+    >
+      Marcar pagada
+    </button>
+  )}
+
+  {c.estatus === "PAGADA" && (
+    <span className="text-green-400 text-xs font-semibold">
+      ✔ Pagada
+    </span>
+  )}
+</td>
+
     </tr>
               ))}
             </tbody>
