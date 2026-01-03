@@ -6,6 +6,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { EstatusCompra } from "@prisma/client";
 
+// ======================================================
+// GET → listar compras (SIN CACHE)
+// ======================================================
 export async function GET() {
   try {
     const compras = await prisma.compraAdministrativa.findMany({
@@ -28,13 +31,17 @@ export async function GET() {
   }
 }
 
+// ======================================================
+// POST → CARGA MASIVA DESDE EXCEL (JSON rows)
+// ======================================================
 export async function POST(req: NextRequest) {
   try {
-    const { rows } = await req.json();
+    const body = await req.json();
+    const rows = body.rows;
 
     if (!Array.isArray(rows)) {
       return NextResponse.json(
-        { error: "rows no es array" },
+        { ok: false, message: "rows no es un array" },
         { status: 400 }
       );
     }
@@ -44,6 +51,7 @@ export async function POST(req: NextRequest) {
 
     for (const row of rows) {
       try {
+        // 🔑 CAMPOS EXACTOS DE TU EXCEL
         const proveedorNombre = String(
           row["PROVEDOR:"] ??
           row["PROVEEDOR"] ??
@@ -65,7 +73,10 @@ export async function POST(req: NextRequest) {
 
         const proveedor = await prisma.proveedor.findFirst({
           where: {
-            nombre: { equals: proveedorNombre, mode: "insensitive" },
+            nombre: {
+              equals: proveedorNombre,
+              mode: "insensitive",
+            },
           },
         });
 
@@ -80,8 +91,11 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        const estatusTexto = String(row["ESTATUS"] ?? "CAPTURADA").toUpperCase();
-        const estatus =
+        const estatusTexto = String(
+          row["ESTATUS"] ?? "CAPTURADA"
+        ).toUpperCase();
+
+        const estatus: EstatusCompra =
           estatusTexto === "PAGADA"
             ? EstatusCompra.PAGADA
             : estatusTexto === "APROBADA"
@@ -109,15 +123,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 🔥 RESPUESTA QUE EL MODAL ENTIENDE
     return NextResponse.json({
       ok: true,
-      insertados,
-      ignorados,
+      message: "Carga masiva completada",
+      resumen: {
+        totalFilas: rows.length,
+        insertados,
+        ignorados,
+      },
     });
   } catch (error) {
     console.error("POST compras-admin:", error);
     return NextResponse.json(
-      { error: "Error POST", detalle: String(error) },
+      { ok: false, message: "Error POST", detalle: String(error) },
       { status: 500 }
     );
   }
