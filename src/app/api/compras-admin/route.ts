@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
     row["STATUS"] ??
     row["ESTADO"] ??
     ""
+    //
   ).toUpperCase() === "PAGADA"
     ? EstatusCompra.PAGADA
     : String(
