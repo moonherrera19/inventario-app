@@ -5,6 +5,8 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import ModalCargaMasiva from "@/components/modals/ModalCargaMasiva";
+import ModalRegistrarFactura from "@/components/modals/ModalRegistrarFactura";
+
 
 const EMPRESAS = ["H&C", "BERRIES BEST", "HACHERA", "4BERRIES"];
 const ESTATUS = ["CAPTURADA", "APROBADA", "PAGADA"] as const;
@@ -375,6 +377,11 @@ const exportarExcel = () => {
         onClose={() => setOpenCargaMasiva(false)}
         onSuccess={fetchCompras}
       />
+      <ModalRegistrarFactura
+  open={mostrarFormulario}
+  onClose={() => setMostrarFormulario(false)}
+/>
+
     </div>
   );
 }
