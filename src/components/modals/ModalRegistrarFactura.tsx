@@ -28,19 +28,34 @@ export default function ModalRegistrarFactura({
     fechaFactura: "",
   });
 
-  // 🔥 cargar proveedores reales
+  // ===============================
+  // CARGAR PROVEEDORES
+  // ===============================
   useEffect(() => {
     if (!open) return;
 
     fetch("/api/proveedores")
       .then(res => res.json())
-      .then(data => setProveedores(data || []));
+      .then(data => setProveedores(Array.isArray(data) ? data : []))
+      .catch(() => setProveedores([]));
   }, [open]);
 
   if (!open) return null;
 
+  // ===============================
+  // GUARDAR FACTURA
+  // ===============================
   const guardarFactura = async () => {
+    if (!form.proveedorId || !form.monto) {
+      alert("Proveedor y monto son obligatorios");
+      return;
+    }
+
     setLoading(true);
+
+    const proveedor = proveedores.find(
+      p => p.id === Number(form.proveedorId)
+    );
 
     const res = await fetch("/api/compras-admin", {
       method: "POST",
@@ -48,8 +63,7 @@ export default function ModalRegistrarFactura({
       body: JSON.stringify({
         rows: [
           {
-            PROVEEDOR: proveedores.find(p => p.id === Number(form.proveedorId))
-              ?.nombre,
+            PROVEEDOR: proveedor?.nombre || "",
             FOLIO: form.numeroFactura,
             PRODUCTO: form.concepto,
             BANCO: form.banco,
@@ -71,6 +85,19 @@ export default function ModalRegistrarFactura({
 
     onSuccess();
     onClose();
+
+    setForm({
+      proveedorId: "",
+      numeroFactura: "",
+      concepto: "",
+      banco: "",
+      cuentaClabe: "",
+      empresa: "",
+      moneda: "MXN",
+      monto: "",
+      fechaFactura: "",
+    });
+
     setLoading(false);
   };
 
@@ -82,6 +109,7 @@ export default function ModalRegistrarFactura({
         </h2>
 
         <div className="grid grid-cols-2 gap-3 text-sm">
+          {/* PROVEEDOR */}
           <select
             className="bg-black p-2 rounded col-span-2"
             value={form.proveedorId}
@@ -97,6 +125,7 @@ export default function ModalRegistrarFactura({
             ))}
           </select>
 
+          {/* FOLIO */}
           <input
             placeholder="Folio"
             className="bg-black p-2 rounded"
@@ -106,6 +135,7 @@ export default function ModalRegistrarFactura({
             }
           />
 
+          {/* EMPRESA */}
           <input
             placeholder="Empresa"
             className="bg-black p-2 rounded"
@@ -115,13 +145,17 @@ export default function ModalRegistrarFactura({
             }
           />
 
+          {/* BANCO */}
           <input
             placeholder="Banco"
             className="bg-black p-2 rounded"
             value={form.banco}
-            onChange={e => setForm({ ...form, banco: e.target.value })}
+            onChange={e =>
+              setForm({ ...form, banco: e.target.value })
+            }
           />
 
+          {/* CLABE */}
           <input
             placeholder="Cuenta / CLABE"
             className="bg-black p-2 rounded"
@@ -131,6 +165,7 @@ export default function ModalRegistrarFactura({
             }
           />
 
+          {/* CONCEPTO */}
           <input
             placeholder="Producto / Concepto"
             className="bg-black p-2 rounded col-span-2"
@@ -140,14 +175,18 @@ export default function ModalRegistrarFactura({
             }
           />
 
+          {/* MONTO */}
           <input
-            placeholder="Monto"
             type="number"
+            placeholder="Monto"
             className="bg-black p-2 rounded"
             value={form.monto}
-            onChange={e => setForm({ ...form, monto: e.target.value })}
+            onChange={e =>
+              setForm({ ...form, monto: e.target.value })
+            }
           />
 
+          {/* FECHA */}
           <input
             type="date"
             className="bg-black p-2 rounded"
