@@ -57,7 +57,15 @@ export async function POST(req: NextRequest) {
 
             numeroFactura: String(row["FOLIO"] ?? "").trim() || null,
 
-            concepto: String(row["PRODUCTO"] ?? "SIN CONCEPTO"),
+            concepto: String(
+  row["PRODUCTO"] ??
+  row["Producto"] ??
+  row["PRODUCTO:"] ??
+  row["PRODUCTO / SERVICIO"] ??
+  row["CONCEPTO"] ??
+  ""
+).trim() || "SIN CONCEPTO",
+
 
             banco: row["BANCO:"] ? String(row["BANCO:"]) : null,
 
