@@ -13,7 +13,7 @@ export async function GET() {
   try {
     const compras = await prisma.compraAdministrativa.findMany({
       include: {
-        proveedor: true, // 🔥 CLAVE: evita pantalla negra en el front
+        proveedor: true,
       },
       orderBy: { creadoEn: "desc" },
     });
@@ -44,6 +44,11 @@ export async function POST(req: NextRequest) {
 
     for (const row of rows) {
       try {
+        // 🔎 detectar columna PRODUCTO aunque tenga espacios raros
+        const productoKey = Object.keys(row).find(key =>
+          key.toUpperCase().includes("PRODUCTO")
+        );
+
         await prisma.compraAdministrativa.create({
           data: {
             // 🔥 FORZADO PARA QUE NO TRUENE PRISMA
@@ -57,15 +62,10 @@ export async function POST(req: NextRequest) {
 
             numeroFactura: String(row["FOLIO"] ?? "").trim() || null,
 
-            concepto: String(
-  row["PRODUCTO"] ??
-  row["Producto"] ??
-  row["PRODUCTO:"] ??
-  row["PRODUCTO / SERVICIO"] ??
-  row["CONCEPTO"] ??
-  ""
-).trim() || "SIN CONCEPTO",
-
+            // ✅ PRODUCTO ROBUSTO
+            concepto: productoKey
+              ? String(row[productoKey]).trim() || "SIN CONCEPTO"
+              : "SIN CONCEPTO",
 
             banco: row["BANCO:"] ? String(row["BANCO:"]) : null,
 
@@ -87,23 +87,32 @@ export async function POST(req: NextRequest) {
             ),
 
             estatus:
-  String(
-    row["ESTATUS"] ??
-    row["STATUS"] ??
-    row["ESTADO"] ??
-    ""
-    //
-  ).toUpperCase() === "PAGADA"
-    ? EstatusCompra.PAGADA
-    : String(
-        row["ESTATUS"] ??
-        row["STATUS"] ??
-        row["ESTADO"] ??
-        ""
-      ).toUpperCase() === "APROBADA"
-    ? EstatusCompra.APROBADA
-    : EstatusCompra.CAPTURADA,
+              String(
+                row["ESTATUS"] ??
+                row["STATUS"] ??
+                row["ESTADO"] ??
+                ""
+              ).toUpperCase() === "PAGADA"
+                ? EstatusCompra.PAGADA
+                : String(
+                    row["ESTATUS"] ??
+                    row["STATUS"] ??
+                    row["ESTADO"] ??
+                    ""
+                  ).toUpperCase() === "APROBADA"
+                ? EstatusCompra.APROBADA
+                : EstatusCompra.CAPTURADA,
 
+            // ✅ FECHA DE PAGO AUTOMÁTICA SI VIENE PAGADA
+            fechaPago:
+              String(
+                row["ESTATUS"] ??
+                row["STATUS"] ??
+                row["ESTADO"] ??
+                ""
+              ).toUpperCase() === "PAGADA"
+                ? new Date()
+                : null,
           },
         });
 
