@@ -380,6 +380,7 @@ const exportarExcel = () => {
       <ModalRegistrarFactura
   open={mostrarFormulario}
   onClose={() => setMostrarFormulario(false)}
+  onSuccess={fetchCompras}
 />
 
     </div>
