@@ -59,31 +59,34 @@ export default function ModalRegistrarFactura({
   // ===============================
   // CAMBIO DE MONEDA (AUTO BANCO / CUENTA)
   // ===============================
-  const onMonedaChange = (moneda: string) => {
-    const proveedor = proveedores.find(
-      p => p.id === Number(form.proveedorId)
-    );
+ // ===============================
+// CAMBIO DE MONEDA (CORRECTO)
+// ===============================
+const onMonedaChange = (moneda: string) => {
+  const proveedor = proveedores.find(
+    p => p.id === Number(form.proveedorId)
+  );
 
-    if (!proveedor) return;
+  if (!proveedor) return;
 
-    let banco = "";
-    let cuenta = "";
+  const banco =
+    moneda === "USD"
+      ? proveedor.bancoDolares || ""
+      : proveedor.banco || "";
 
-    if (moneda === "USD") {
-      banco = proveedor.bancoUsd || "";
-      cuenta = proveedor.clabeUsd || proveedor.cuentaUsd || "";
-    } else {
-      banco = proveedor.bancoMxn || "";
-      cuenta = proveedor.clabeMxn || proveedor.cuentaMxn || "";
-    }
+  const cuenta =
+    moneda === "USD"
+      ? proveedor.clabeDolares || proveedor.numeroCuentaDolares || ""
+      : proveedor.clabe || proveedor.numeroCuenta || "";
 
-    setForm(prev => ({
-      ...prev,
-      moneda,
-      banco,
-      cuentaClabe: cuenta,
-    }));
-  };
+  setForm(prev => ({
+    ...prev,
+    moneda,
+    banco,
+    cuentaClabe: cuenta,
+  }));
+};
+
 
   if (!open) return null;
 
