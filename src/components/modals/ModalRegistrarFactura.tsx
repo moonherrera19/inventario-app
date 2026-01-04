@@ -8,6 +8,9 @@ interface Props {
   onSuccess: () => void;
 }
 
+const EMPRESAS = ["H&C", "BERRIES BEST", "HACHERA", "4BERRIES"];
+const MONEDAS = ["MXN", "USD"];
+
 export default function ModalRegistrarFactura({
   open,
   onClose,
@@ -23,7 +26,7 @@ export default function ModalRegistrarFactura({
     banco: "",
     cuentaClabe: "",
     empresa: "",
-    moneda: "MXN",
+    moneda: "",
     monto: "",
     fechaFactura: "",
   });
@@ -40,14 +43,56 @@ export default function ModalRegistrarFactura({
       .catch(() => setProveedores([]));
   }, [open]);
 
+  // ===============================
+  // CAMBIO DE PROVEEDOR
+  // ===============================
+  const onProveedorChange = (id: string) => {
+    setForm(prev => ({
+      ...prev,
+      proveedorId: id,
+      moneda: "",
+      banco: "",
+      cuentaClabe: "",
+    }));
+  };
+
+  // ===============================
+  // CAMBIO DE MONEDA
+  // ===============================
+  const onMonedaChange = (moneda: string) => {
+    const proveedor = proveedores.find(
+      p => p.id === Number(form.proveedorId)
+    );
+
+    if (!proveedor) return;
+
+    // 🔥 AJUSTA ESTO A TU ESTRUCTURA REAL
+    const banco =
+      moneda === "USD"
+        ? proveedor.bancoUsd || ""
+        : proveedor.banco || "";
+
+    const cuenta =
+      moneda === "USD"
+        ? proveedor.cuentaUsd || ""
+        : proveedor.cuentaClabe || "";
+
+    setForm(prev => ({
+      ...prev,
+      moneda,
+      banco,
+      cuentaClabe: cuenta,
+    }));
+  };
+
   if (!open) return null;
 
   // ===============================
   // GUARDAR FACTURA
   // ===============================
   const guardarFactura = async () => {
-    if (!form.proveedorId || !form.monto) {
-      alert("Proveedor y monto son obligatorios");
+    if (!form.proveedorId || !form.monto || !form.empresa || !form.moneda) {
+      alert("Proveedor, empresa, moneda y monto son obligatorios");
       return;
     }
 
@@ -93,7 +138,7 @@ export default function ModalRegistrarFactura({
       banco: "",
       cuentaClabe: "",
       empresa: "",
-      moneda: "MXN",
+      moneda: "",
       monto: "",
       fechaFactura: "",
     });
@@ -109,13 +154,12 @@ export default function ModalRegistrarFactura({
         </h2>
 
         <div className="grid grid-cols-2 gap-3 text-sm">
+
           {/* PROVEEDOR */}
           <select
             className="bg-black p-2 rounded col-span-2"
             value={form.proveedorId}
-            onChange={e =>
-              setForm({ ...form, proveedorId: e.target.value })
-            }
+            onChange={e => onProveedorChange(e.target.value)}
           >
             <option value="">Selecciona proveedor</option>
             {proveedores.map(p => (
@@ -136,23 +180,38 @@ export default function ModalRegistrarFactura({
           />
 
           {/* EMPRESA */}
-          <input
-            placeholder="Empresa"
+          <select
             className="bg-black p-2 rounded"
             value={form.empresa}
             onChange={e =>
               setForm({ ...form, empresa: e.target.value })
             }
-          />
+          >
+            <option value="">Selecciona empresa</option>
+            {EMPRESAS.map(e => (
+              <option key={e} value={e}>{e}</option>
+            ))}
+          </select>
+
+          {/* MONEDA */}
+          <select
+            className="bg-black p-2 rounded"
+            value={form.moneda}
+            onChange={e => onMonedaChange(e.target.value)}
+            disabled={!form.proveedorId}
+          >
+            <option value="">Moneda</option>
+            {MONEDAS.map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
 
           {/* BANCO */}
           <input
             placeholder="Banco"
             className="bg-black p-2 rounded"
             value={form.banco}
-            onChange={e =>
-              setForm({ ...form, banco: e.target.value })
-            }
+            readOnly
           />
 
           {/* CLABE */}
@@ -160,9 +219,7 @@ export default function ModalRegistrarFactura({
             placeholder="Cuenta / CLABE"
             className="bg-black p-2 rounded"
             value={form.cuentaClabe}
-            onChange={e =>
-              setForm({ ...form, cuentaClabe: e.target.value })
-            }
+            readOnly
           />
 
           {/* CONCEPTO */}
