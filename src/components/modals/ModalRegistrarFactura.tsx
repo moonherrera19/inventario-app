@@ -57,7 +57,7 @@ export default function ModalRegistrarFactura({
   };
 
   // ===============================
-  // CAMBIO DE MONEDA
+  // CAMBIO DE MONEDA (AUTO BANCO / CUENTA)
   // ===============================
   const onMonedaChange = (moneda: string) => {
     const proveedor = proveedores.find(
@@ -66,16 +66,16 @@ export default function ModalRegistrarFactura({
 
     if (!proveedor) return;
 
-    // 🔥 AJUSTA ESTO A TU ESTRUCTURA REAL
-    const banco =
-      moneda === "USD"
-        ? proveedor.bancoUsd || ""
-        : proveedor.banco || "";
+    let banco = "";
+    let cuenta = "";
 
-    const cuenta =
-      moneda === "USD"
-        ? proveedor.cuentaUsd || ""
-        : proveedor.cuentaClabe || "";
+    if (moneda === "USD") {
+      banco = proveedor.bancoUsd || "";
+      cuenta = proveedor.clabeUsd || proveedor.cuentaUsd || "";
+    } else {
+      banco = proveedor.bancoMxn || "";
+      cuenta = proveedor.clabeMxn || proveedor.cuentaMxn || "";
+    }
 
     setForm(prev => ({
       ...prev,
@@ -91,7 +91,7 @@ export default function ModalRegistrarFactura({
   // GUARDAR FACTURA
   // ===============================
   const guardarFactura = async () => {
-    if (!form.proveedorId || !form.monto || !form.empresa || !form.moneda) {
+    if (!form.proveedorId || !form.empresa || !form.moneda || !form.monto) {
       alert("Proveedor, empresa, moneda y monto son obligatorios");
       return;
     }
@@ -206,7 +206,7 @@ export default function ModalRegistrarFactura({
             ))}
           </select>
 
-          {/* BANCO */}
+          {/* BANCO (AUTO) */}
           <input
             placeholder="Banco"
             className="bg-black p-2 rounded"
@@ -214,7 +214,7 @@ export default function ModalRegistrarFactura({
             readOnly
           />
 
-          {/* CLABE */}
+          {/* CUENTA / CLABE (AUTO) */}
           <input
             placeholder="Cuenta / CLABE"
             className="bg-black p-2 rounded"
