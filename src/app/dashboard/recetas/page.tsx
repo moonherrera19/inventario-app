@@ -1,70 +1,99 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import RecetaModal from "@/components/recetas/RecetaModal";
+import AplicacionModal from "@/components/aplicaciones/AplicacionModal";
 
-export default function AplicacionModal({ open, onClose }: any) {
-  const [form, setForm] = useState({
-    fecha: "",
-    horaInicio: "",
-    horaFin: "",
-    aplicadores: "",
-    producto: "",
-    cantidadBarril: "",
-    cantidadTotal: "",
-    sectores: "",
-    rancho: "",
-    cultivo: "",
-    observaciones: "",
-  });
+export default function RecetasPage() {
+  const [recetas, setRecetas] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleChange = (e: any) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+  const [openModal, setOpenModal] = useState(false);
+  const [openAplicacion, setOpenAplicacion] = useState(false);
+
+  // ============================
+  // CARGAR RECETAS
+  // ============================
+  const cargarRecetas = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/recetas");
+      const data = await res.json();
+      setRecetas(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = async () => {
-    await fetch("/api/aplicaciones", {
-      method: "POST",
-      body: JSON.stringify(form),
-    });
-
-    onClose();
+  // ============================
+  // CARGAR PRODUCTOS
+  // ============================
+  const cargarProductos = async () => {
+    const res = await fetch("/api/productos");
+    const data = await res.json();
+    setProductos(data);
   };
 
-  if (!open) return null;
+  useEffect(() => {
+    cargarRecetas();
+    cargarProductos();
+  }, []);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
-      <div className="bg-gray-900 p-6 rounded-xl w-full max-w-2xl space-y-3">
-        <h2 className="text-green-400 text-xl">Nueva Aplicación</h2>
+    <div className="p-6 space-y-6">
+      {/* BOTONES */}
+      <div className="flex gap-3">
+        <button
+          className="bg-green-600 px-4 py-2 rounded"
+          onClick={() => setOpenModal(true)}
+        >
+          + Nueva Receta
+        </button>
 
-        <input type="date" name="fecha" onChange={handleChange} className="input" />
-        <input type="time" name="horaInicio" onChange={handleChange} className="input" />
-        <input type="time" name="horaFin" onChange={handleChange} className="input" />
-
-        <input name="aplicadores" placeholder="Aplicadores" onChange={handleChange} className="input" />
-
-        <input name="producto" placeholder="Producto" onChange={handleChange} className="input" />
-        <input name="cantidadBarril" placeholder="Cant x barril" onChange={handleChange} className="input" />
-        <input name="cantidadTotal" placeholder="Cant total" onChange={handleChange} className="input" />
-
-        <input name="sectores" placeholder="Sectores" onChange={handleChange} className="input" />
-        <input name="rancho" placeholder="Rancho" onChange={handleChange} className="input" />
-        <input name="cultivo" placeholder="Cultivo" onChange={handleChange} className="input" />
-
-        <textarea name="observaciones" placeholder="Observaciones" onChange={handleChange} className="input h-20" />
-
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="bg-gray-600 px-3 py-1 rounded">
-            Cancelar
-          </button>
-          <button onClick={handleSubmit} className="bg-green-600 px-3 py-1 rounded">
-            Guardar
-          </button>
-        </div>
+        <button
+          className="bg-blue-600 px-4 py-2 rounded"
+          onClick={() => setOpenAplicacion(true)}
+        >
+          + Nueva Aplicación
+        </button>
       </div>
+
+      {/* LISTA */}
+      {loading ? (
+        <p className="text-white">Cargando...</p>
+      ) : recetas.length === 0 ? (
+        <p className="text-gray-400">No hay recetas aún</p>
+      ) : (
+        <div className="grid gap-3">
+          {recetas.map((r: any) => (
+            <div
+              key={r.id}
+              className="bg-gray-800 p-4 rounded border border-green-500"
+            >
+              <p className="text-green-400 font-bold">{r.nombre}</p>
+              <p className="text-sm text-gray-300">
+                Ingredientes: {r.ingredientes?.length || 0}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* MODALES */}
+      <RecetaModal
+        open={openModal}
+        onClose={() => setOpenModal(false)}
+        refresh={cargarRecetas}
+        productos={productos}
+      />
+
+      <AplicacionModal
+        open={openAplicacion}
+        onClose={() => setOpenAplicacion(false)}
+      />
     </div>
   );
 }
