@@ -173,17 +173,24 @@ const borrarTodo = async () => {
 
   if (!confirmar) return;
 
-  const res = await fetch("/api/compras-admin/reset", {
-    method: "DELETE",
-  });
+  try {
+    const res = await fetch("/api/compras-admin/reset", {
+      method: "DELETE",
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if (data.ok) {
-    alert("✅ Datos eliminados");
-    cargarCompras(); // o cargarCompras (según tu función)
-  } else {
-    alert("❌ Error al borrar");
+    if (data.ok) {
+      alert("✅ Datos eliminados correctamente");
+
+      // 🔥 ESTO EVITA TU ERROR
+      window.location.reload();
+    } else {
+      alert("❌ Error al borrar");
+    }
+  } catch (error) {
+    console.error(error);
+    alert("❌ Error de conexión");
   }
 };
 
@@ -259,12 +266,9 @@ const borrarTodo = async () => {
         <button onClick={() => setMostrarFormulario(true)} className="bg-blue-600 px-4 py-2 rounded font-semibold">
           Registrar factura
         </button>
-        <button
-  onClick={borrarTodo}
-  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
->
-  Borrar Todo
-</button>
+        <button onClick={borrarTodo}className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+         Borrar Todo
+        </button>
         <button
           onClick={() => setOpenCargaMasiva(true)}
           className="bg-purple-600 px-4 py-2 rounded font-semibold"
