@@ -181,7 +181,7 @@ const borrarTodo = async () => {
 
   if (data.ok) {
     alert("✅ Datos eliminados");
-    cargarRecetas(); // o cargarCompras (según tu función)
+    cargarCompras(); // o cargarCompras (según tu función)
   } else {
     alert("❌ Error al borrar");
   }
