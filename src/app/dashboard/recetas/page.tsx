@@ -1,72 +1,70 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import RecetaModal from "@/components/recetas/RecetaModal";
+import { useState } from "react";
 
-export default function RecetasPage() {
-  const [recetas, setRecetas] = useState([]);
-  const [productos, setProductos] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function AplicacionModal({ open, onClose }: any) {
+  const [form, setForm] = useState({
+    fecha: "",
+    horaInicio: "",
+    horaFin: "",
+    aplicadores: "",
+    producto: "",
+    cantidadBarril: "",
+    cantidadTotal: "",
+    sectores: "",
+    rancho: "",
+    cultivo: "",
+    observaciones: "",
+  });
 
-  const [openModal, setOpenModal] = useState(false);
-  const [editData, setEditData] = useState(null);
-
-  // ============================
-  // CARGAR RECETAS
-  // ============================
-  const cargarRecetas = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/recetas");
-      const data = await res.json();
-      setRecetas(data);
-    } catch (error) {
-      console.error("Error cargando recetas:", error);
-    } finally {
-      setLoading(false);
-    }
+  const handleChange = (e: any) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  // ============================
-  // CARGAR PRODUCTOS  ✔ AQUI ESTABA EL PROBLEMA
-  // ============================
-  const cargarProductos = async () => {
-    try {
-      const res = await fetch("/api/productos");
-      const data = await res.json();
-      setProductos(data);
-    } catch (error) {
-      console.error("Error cargando productos:", error);
-    }
+  const handleSubmit = async () => {
+    await fetch("/api/aplicaciones", {
+      method: "POST",
+      body: JSON.stringify(form),
+    });
+
+    onClose();
   };
 
-  // ============================
-  // INICIALIZAR
-  // ============================
-  useEffect(() => {
-    cargarRecetas();
-    cargarProductos(); // ✔ IMPORTANTE
-  }, []);
+  if (!open) return null;
 
   return (
-    <div className="p-6">
-      <button
-        className="bg-green-600 px-4 py-2 rounded"
-        onClick={() => setOpenModal(true)}
-      >
-        + Nueva Receta
-      </button>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
+      <div className="bg-gray-900 p-6 rounded-xl w-full max-w-2xl space-y-3">
+        <h2 className="text-green-400 text-xl">Nueva Aplicación</h2>
 
-      <RecetaModal
-        open={openModal}
-        onClose={() => {
-          setOpenModal(false);
-          setEditData(null);
-        }}
-        refresh={cargarRecetas}
-        editData={editData}
-        productos={productos} // ✔ MANDAR PRODUCTOS
-      />
+        <input type="date" name="fecha" onChange={handleChange} className="input" />
+        <input type="time" name="horaInicio" onChange={handleChange} className="input" />
+        <input type="time" name="horaFin" onChange={handleChange} className="input" />
+
+        <input name="aplicadores" placeholder="Aplicadores" onChange={handleChange} className="input" />
+
+        <input name="producto" placeholder="Producto" onChange={handleChange} className="input" />
+        <input name="cantidadBarril" placeholder="Cant x barril" onChange={handleChange} className="input" />
+        <input name="cantidadTotal" placeholder="Cant total" onChange={handleChange} className="input" />
+
+        <input name="sectores" placeholder="Sectores" onChange={handleChange} className="input" />
+        <input name="rancho" placeholder="Rancho" onChange={handleChange} className="input" />
+        <input name="cultivo" placeholder="Cultivo" onChange={handleChange} className="input" />
+
+        <textarea name="observaciones" placeholder="Observaciones" onChange={handleChange} className="input h-20" />
+
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="bg-gray-600 px-3 py-1 rounded">
+            Cancelar
+          </button>
+          <button onClick={handleSubmit} className="bg-green-600 px-3 py-1 rounded">
+            Guardar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

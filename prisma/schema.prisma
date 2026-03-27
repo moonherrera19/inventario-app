@@ -145,6 +145,7 @@ model Receta {
   id           Int           @id @default(autoincrement())
   nombre       String
   ingredientes Ingrediente[]
+  aplicaciones Aplicacion[]
 }
 
 model Ingrediente {
@@ -178,4 +179,27 @@ enum EstatusCompra {
   CAPTURADA
   APROBADA
   PAGADA
+}
+model Aplicacion {
+  id              Int      @id @default(autoincrement())
+  recetaId        Int?
+
+  fecha           DateTime
+  horaInicio      String?
+  horaFin         String?
+  aplicadores     Int?
+
+  producto        String?
+  cantidadBarril  Float?
+  cantidadTotal   Float?
+
+  sectores        String?
+  rancho          String?
+  cultivo         String?
+
+  observaciones   String?
+
+  creadoEn        DateTime @default(now())
+
+  receta          Receta?  @relation(fields: [recetaId], references: [id])
 }
