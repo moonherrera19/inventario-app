@@ -167,6 +167,26 @@ const exportarExcel = () => {
     XLSX.writeFile(wb, "reporte_compras.xlsx");
   };
 
+  //BOTON DE BORRAR
+const borrarTodo = async () => {
+  const confirmar = confirm("⚠️ ¿Seguro que quieres borrar TODAS las compras?");
+
+  if (!confirmar) return;
+
+  const res = await fetch("/api/compras-admin/reset", {
+    method: "DELETE",
+  });
+
+  const data = await res.json();
+
+  if (data.ok) {
+    alert("✅ Datos eliminados");
+    cargarRecetas(); // o cargarCompras (según tu función)
+  } else {
+    alert("❌ Error al borrar");
+  }
+};
+
   // ===============================
   // EXPORTAR PDF
   // ===============================
@@ -239,6 +259,12 @@ const exportarExcel = () => {
         <button onClick={() => setMostrarFormulario(true)} className="bg-blue-600 px-4 py-2 rounded font-semibold">
           Registrar factura
         </button>
+        <button
+  onClick={borrarTodo}
+  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+>
+  Borrar Todo
+</button>
         <button
           onClick={() => setOpenCargaMasiva(true)}
           className="bg-purple-600 px-4 py-2 rounded font-semibold"
