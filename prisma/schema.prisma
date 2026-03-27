@@ -33,7 +33,7 @@ model Categoria {
 
 model Proveedor {
   id                  Int                    @id @default(autoincrement())
-  nombre              String
+  nombre              String                 @unique  // 🔥 FIX CLAVE
   telefono            String?
   direccion           String?
   banco               String?

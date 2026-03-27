@@ -26,7 +26,7 @@ export async function GET() {
 }
 
 // ===============================
-// POST → CARGA MASIVA (INSERTA TODO SIN VALIDAR)
+// POST → CARGA MASIVA CORREGIDA
 // ===============================
 export async function POST(req: NextRequest) {
   try {
@@ -44,73 +44,88 @@ export async function POST(req: NextRequest) {
 
     for (const row of rows) {
       try {
-        // 🔎 detectar columna PRODUCTO aunque tenga espacios raros
-        const productoKey = Object.keys(row).find(key =>
+        // 🔎 detectar columna PRODUCTO (flexible)
+        const productoKey = Object.keys(row).find((key) =>
           key.toUpperCase().includes("PRODUCTO")
         );
 
+        // 🔥 LIMPIAR NOMBRE PROVEEDOR
+        const nombreProveedor = String(
+          row["PROVEDOR:"] ??
+          row["PROVEEDOR"] ??
+          ""
+        ).trim();
+
+        if (!nombreProveedor) {
+          console.warn("Fila sin proveedor:", row);
+          ignorados++;
+          continue;
+        }
+
+        // 🔥 CREAR O REUTILIZAR PROVEEDOR
+        const proveedor = await prisma.proveedor.upsert({
+          where: {
+            nombre: nombreProveedor,
+          },
+          update: {},
+          create: {
+            nombre: nombreProveedor,
+          },
+        });
+
+        // 🔥 LIMPIEZA DE MONTO
+        const monto = Number(
+          String(row["TOTAL:"] ?? row["TOTAL"] ?? 0)
+            .replace(/[$,]/g, "")
+        );
+
+        // 🔥 LIMPIEZA DE ESTATUS
+        const estatusTexto = String(
+          row["ESTATUS"] ??
+          row["STATUS"] ??
+          row["ESTADO"] ??
+          ""
+        ).toUpperCase();
+
+        const estatus =
+          estatusTexto === "PAGADA"
+            ? EstatusCompra.PAGADA
+            : estatusTexto === "APROBADA"
+            ? EstatusCompra.APROBADA
+            : EstatusCompra.CAPTURADA;
+
+        // 🔥 CREAR REGISTRO
         await prisma.compraAdministrativa.create({
           data: {
-            // 🔥 FORZADO PARA QUE NO TRUENE PRISMA
-            proveedorId: 1,
-
-            proveedorNombre: String(
-              row["PROVEDOR:"] ??
-              row["PROVEEDOR"] ??
-              ""
-            ).trim() || null,
+            proveedorId: proveedor.id,
+            proveedorNombre: nombreProveedor,
 
             numeroFactura: String(row["FOLIO"] ?? "").trim() || null,
 
-            // ✅ PRODUCTO ROBUSTO
             concepto: productoKey
               ? String(row[productoKey]).trim() || "SIN CONCEPTO"
               : "SIN CONCEPTO",
 
-            banco: row["BANCO:"] ? String(row["BANCO:"]) : null,
+            banco: row["BANCO:"] ? String(row["BANCO:"]).trim() : null,
 
             cuentaClabe: row["CUENTA/CLABE:"]
-              ? String(row["CUENTA/CLABE:"])
+              ? String(row["CUENTA/CLABE:"]).trim()
               : null,
 
             empresa: row["EMPRESA:"]
-              ? String(row["EMPRESA:"])
+              ? String(row["EMPRESA:"]).trim()
               : null,
 
             moneda: row["MONEDA:"]
-              ? String(row["MONEDA:"])
+              ? String(row["MONEDA:"]).trim()
               : "MXN",
 
-            monto: Number(
-              String(row["TOTAL:"] ?? row["TOTAL"] ?? 0)
-                .replace(/[$,]/g, "")
-            ),
+            monto: isNaN(monto) ? 0 : monto,
 
-            estatus:
-              String(
-                row["ESTATUS"] ??
-                row["STATUS"] ??
-                row["ESTADO"] ??
-                ""
-              ).toUpperCase() === "PAGADA"
-                ? EstatusCompra.PAGADA
-                : String(
-                    row["ESTATUS"] ??
-                    row["STATUS"] ??
-                    row["ESTADO"] ??
-                    ""
-                  ).toUpperCase() === "APROBADA"
-                ? EstatusCompra.APROBADA
-                : EstatusCompra.CAPTURADA,
+            estatus,
 
-            // ✅ FECHA DE PAGO AUTOMÁTICA SI VIENE PAGADA
             fechaPago:
-              String(
-                row["ESTATUS"] ??
-                row["STATUS"] ??
-                row["ESTADO"] ??
-                ""
-              ).toUpperCase() === "PAGADA"
+              estatus === EstatusCompra.PAGADA
                 ? new Date()
                 : null,
           },
