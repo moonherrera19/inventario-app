@@ -30,7 +30,7 @@ export async function GET() {
 // - manejaLotes = false → salida directa
 // - manejaLotes = true  → FIFO por lote
 // ===========================================
-
+const body = await req.json();
 export async function POST(req: Request) {
   try {
     const { productoId, cantidad, rancho, cultivo, fecha, items } = body;
