@@ -30,9 +30,10 @@ export async function GET() {
 // - manejaLotes = false → salida directa
 // - manejaLotes = true  → FIFO por lote
 // ===========================================
+
 export async function POST(req: Request) {
   try {
-    const { productoId, cantidad, rancho, cultivo } = await req.json();
+    const { productoId, cantidad, rancho, cultivo, fecha, items } = body;
 
     if (!productoId || !cantidad || cantidad <= 0) {
       return NextResponse.json(
@@ -141,6 +142,7 @@ export async function POST(req: Request) {
             cantidad: descontar,
             rancho: rancho || null,
             cultivo: cultivo || null,
+             fecha: fecha ? new Date(fecha) : new Date(), // 👈 NUEVO
           },
         });
 
