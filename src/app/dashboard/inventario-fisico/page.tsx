@@ -137,47 +137,41 @@ export default function InventarioFisicoPage() {
   });
 
   const [mostrarResumen, setMostrarResumen] = useState<boolean>(false);
+  const [aplicando, setAplicando] = useState<boolean>(false);
+  const [errorAjuste, setErrorAjuste] = useState<string | null>(null);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
 
   /* -------------------- FETCH -------------------- */
 
-  useEffect(() => {
-    let activo = true;
+  async function cargarProductos(): Promise<void> {
+    setCargando(true);
+    setError(null);
 
-    async function cargarProductos(): Promise<void> {
-      setCargando(true);
-      setError(null);
+    try {
+      const res = await fetch("/api/inventario-fisico", {
+        method: "GET",
+        cache: "no-store",
+      });
 
-      try {
-        const res = await fetch("/api/inventario-fisico", {
-          method: "GET",
-          cache: "no-store",
-        });
+      const json: InventarioFisicoApiResponse = await res.json();
 
-        const json: InventarioFisicoApiResponse = await res.json();
-
-        if (!activo) return;
-
-        if (!json.success) {
-          setError(json.message);
-          setProductos([]);
-          return;
-        }
-
-        setProductos(json.data);
-      } catch {
-        if (!activo) return;
-        setError("No fue posible conectar con el servidor.");
+      if (!json.success) {
+        setError(json.message);
         setProductos([]);
-      } finally {
-        if (activo) setCargando(false);
+        return;
       }
+
+      setProductos(json.data);
+    } catch {
+      setError("No fue posible conectar con el servidor.");
+      setProductos([]);
+    } finally {
+      setCargando(false);
     }
+  }
 
+  useEffect(() => {
     void cargarProductos();
-
-    return () => {
-      activo = false;
-    };
   }, []);
 
   /* -------------------- ACCIONES -------------------- */
@@ -212,9 +206,101 @@ export default function InventarioFisicoPage() {
   }
 
   function handleAplicarAjustes(): void {
-    // Solo visual por ahora. La lógica real (creación de Entradas/Salidas
-    // reutilizando el motor existente) queda preparada para el Sprint 4.
+    setErrorAjuste(null);
+    setMensajeExito(null);
+
+    const revisados = filas.filter((f) => f.revisado);
+
+    if (revisados.length === 0) {
+      setErrorAjuste("No hay productos revisados para aplicar.");
+      return;
+    }
+
+    const sinConteo = revisados.filter((f) => f.conteoNumero === null);
+    if (sinConteo.length > 0) {
+      setErrorAjuste(
+        `Hay ${sinConteo.length} producto(s) revisado(s) sin conteo físico capturado.`
+      );
+      return;
+    }
+
+    const conNegativo = revisados.filter(
+      (f) => f.conteoNumero !== null && f.conteoNumero < 0
+    );
+    if (conNegativo.length > 0) {
+      setErrorAjuste(
+        `Hay ${conNegativo.length} producto(s) con un conteo físico negativo, lo cual no es válido.`
+      );
+      return;
+    }
+
+    const idsVistos = new Set<number>();
+    for (const fila of revisados) {
+      if (idsVistos.has(fila.id)) {
+        setErrorAjuste(`El producto "${fila.nombre}" está duplicado.`);
+        return;
+      }
+      idsVistos.add(fila.id);
+    }
+
     setMostrarResumen(true);
+  }
+
+  async function confirmarAplicarAjustes(): Promise<void> {
+    setAplicando(true);
+    setErrorAjuste(null);
+
+    try {
+      const payload: { productoId: number; conteoFisico: number }[] = filas
+        .filter((f) => f.revisado && f.conteoNumero !== null)
+        .map((f) => ({
+          productoId: f.id,
+          conteoFisico: f.conteoNumero as number,
+        }));
+
+      const res = await fetch("/api/inventario-fisico/aplicar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json: {
+        success: boolean;
+        entradas?: number;
+        salidas?: number;
+        sinCambios?: number;
+        message?: string;
+      } = await res.json();
+
+      if (!json.success) {
+        setErrorAjuste(json.message ?? "No fue posible aplicar los ajustes.");
+        return;
+      }
+
+      // Limpia el conteo/revisado únicamente de los productos que se
+      // acaban de procesar, sin recargar la página.
+      const idsAplicados = new Set(payload.map((p) => p.productoId));
+      setConteos((prev) => {
+        const nuevo = { ...prev };
+        idsAplicados.forEach((id) => {
+          delete nuevo[id];
+        });
+        return nuevo;
+      });
+
+      // Refresca productos (stock actualizado por el motor de Entradas/Salidas)
+      // para que Dashboard, tabla y KPIs se actualicen solos.
+      await cargarProductos();
+
+      setMostrarResumen(false);
+      setMensajeExito(
+        `Inventario actualizado correctamente. Entradas: ${json.entradas}, Salidas: ${json.salidas}, Sin cambios: ${json.sinCambios}.`
+      );
+    } catch {
+      setErrorAjuste("No fue posible conectar con el servidor.");
+    } finally {
+      setAplicando(false);
+    }
   }
 
   /* -------------------- DATOS DERIVADOS -------------------- */
@@ -303,11 +389,13 @@ export default function InventarioFisicoPage() {
   }, [filas]);
 
   const resumenAjustes = useMemo(() => {
-    const entradas = filas.filter((f) => f.movimiento === "Entrada").length;
-    const salidas = filas.filter((f) => f.movimiento === "Salida").length;
-    const sinCambios = filas.filter(
-      (f) => f.movimiento === "Ninguno" || f.movimiento === "Sin capturar"
+    const entradas = filas.filter(
+      (f) => f.revisado && f.movimiento === "Entrada"
     ).length;
+    const salidas = filas.filter(
+      (f) => f.revisado && f.movimiento === "Salida"
+    ).length;
+    const sinCambios = filas.length - entradas - salidas;
 
     return { entradas, salidas, sinCambios };
   }, [filas]);
@@ -328,6 +416,18 @@ export default function InventarioFisicoPage() {
           </p>
         </div>
       </div>
+
+      {errorAjuste && (
+        <div className="mb-6 rounded-xl border border-red-800 bg-red-950/30 text-red-300 px-4 py-3">
+          {errorAjuste}
+        </div>
+      )}
+
+      {mensajeExito && (
+        <div className="mb-6 rounded-xl border border-green-800 bg-green-950/30 text-green-300 px-4 py-3">
+          {mensajeExito}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
@@ -573,28 +673,30 @@ export default function InventarioFisicoPage() {
         </div>
       )}
 
-      {/* MODAL RESUMEN (SOLO VISUAL / PREVIA) */}
+      {/* MODAL RESUMEN / CONFIRMACIÓN */}
       {mostrarResumen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
           <div className="bg-[#151a20] border border-green-800 rounded-2xl p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold text-green-400 mb-4">
-              Resumen de Ajustes
+            <h2 className="text-xl font-bold text-green-400 mb-1">
+              ¿Desea aplicar los ajustes?
             </h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Esta acción creará Entradas/Salidas reutilizando el motor
+              existente. No modifica el stock ni los lotes directamente.
+            </p>
 
             <div className="space-y-2 text-gray-300 mb-6">
               <p>
-                Se crearán{" "}
+                Entradas:{" "}
                 <span className="text-blue-400 font-semibold">
                   {resumenAjustes.entradas}
-                </span>{" "}
-                Entradas.
+                </span>
               </p>
               <p>
-                Se crearán{" "}
+                Salidas:{" "}
                 <span className="text-orange-400 font-semibold">
                   {resumenAjustes.salidas}
-                </span>{" "}
-                Salidas.
+                </span>
               </p>
               <p>
                 Productos sin cambios:{" "}
@@ -604,18 +706,26 @@ export default function InventarioFisicoPage() {
               </p>
             </div>
 
-            <p className="text-xs text-gray-500 mb-6">
-              Este proceso reutilizará el motor de Entradas/Salidas existente
-              y estará disponible a partir del Sprint 4. Por ahora esta
-              vista es únicamente informativa.
-            </p>
+            {errorAjuste && (
+              <div className="mb-4 rounded-lg border border-red-800 bg-red-950/30 text-red-300 px-3 py-2 text-sm">
+                {errorAjuste}
+              </div>
+            )}
 
             <div className="flex justify-end gap-3">
               <button
+                disabled={aplicando}
                 onClick={() => setMostrarResumen(false)}
-                className="px-4 py-2 rounded-xl border border-gray-700 text-gray-300 hover:bg-gray-800"
+                className="px-4 py-2 rounded-xl border border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-50"
               >
-                Cerrar
+                Cancelar
+              </button>
+              <button
+                disabled={aplicando}
+                onClick={() => void confirmarAplicarAjustes()}
+                className="px-4 py-2 rounded-xl bg-green-700 hover:bg-green-600 font-semibold disabled:opacity-60"
+              >
+                {aplicando ? "Aplicando..." : "Aplicar"}
               </button>
             </div>
           </div>
