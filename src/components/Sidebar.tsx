@@ -20,9 +20,16 @@ export default function Sidebar() {
       </h2>
 
       <nav className="flex flex-col gap-3">
-        <Link href="/dashboard" className={linkClass("/dashboard")}>
+
+        {/* ================= Dashboard ================= */}
+        <Link
+          href="/dashboard"
+          className={linkClass("/dashboard")}
+        >
           Dashboard
         </Link>
+
+        {/* ================= Catálogos ================= */}
 
         <Link
           href="/dashboard/productos"
@@ -45,6 +52,8 @@ export default function Sidebar() {
           Proveedores
         </Link>
 
+        {/* ================= Operación ================= */}
+
         <Link
           href="/dashboard/entradas"
           className={linkClass("/dashboard/entradas")}
@@ -59,13 +68,22 @@ export default function Sidebar() {
           Salidas
         </Link>
 
-        {/* 🔥 INVENTARIO POR LOTE (CORREGIDO) */}
         <Link
           href="/dashboard/inventario-lotes"
           className={linkClass("/dashboard/inventario-lotes")}
         >
-          Inventario por Lote
+          Inventario por Lotes
         </Link>
+
+        {/* 🆕 NUEVO MÓDULO */}
+        <Link
+          href="/dashboard/inventario-fisico"
+          className={linkClass("/dashboard/inventario-fisico")}
+        >
+          Inventario Físico
+        </Link>
+
+        {/* ================= Administración ================= */}
 
         <Link
           href="/dashboard/compras"
@@ -73,12 +91,13 @@ export default function Sidebar() {
         >
           Compras
         </Link>
+
         <Link
-  href="/dashboard/compras-admin"
-  className={linkClass("/dashboard/compras-admin")}
->
-  Compras Administrativas
-</Link>
+          href="/dashboard/compras-admin"
+          className={linkClass("/dashboard/compras-admin")}
+        >
+          Compras Administrativas
+        </Link>
 
         <Link
           href="/dashboard/recetas"
@@ -87,12 +106,15 @@ export default function Sidebar() {
           Recetas
         </Link>
 
+        {/* ================= Reportes ================= */}
+
         <Link
           href="/dashboard/reportes"
           className={linkClass("/dashboard/reportes")}
         >
           Reportes
         </Link>
+
       </nav>
     </div>
   );
