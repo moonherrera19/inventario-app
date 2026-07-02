@@ -431,4 +431,4 @@ export async function GET() {
     console.error("❌ Error PDF INVENTARIO:", error);
     return NextResponse.json({ msg: "Error generando PDF" }, { status: 500 });
   }
-}git status
+}
