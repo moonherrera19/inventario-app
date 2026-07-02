@@ -1,22 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-/**
- * ⚠️ ADAPTA ESTOS DOS IMPORTS A TUS SERVICIOS REALES DE ENTRADAS Y SALIDAS.
- *
- * No tengo acceso a tu código actual de `Entradas` / `Salidas` / FIFO, así
- * que asumo que expones funciones capaces de recibir el cliente de
- * transacción (`tx`) para que todo corra dentro del MISMO
- * `prisma.$transaction` y así garantizar el rollback atómico.
- *
- * Si tus funciones ya existen con otra firma (por ejemplo reciben un
- * `motivoId`, o un `usuarioId`, o el nombre es `registrarEntrada`), solo
- * ajusta la llamada dentro de `aplicarInventarioFisico` más abajo. La
- * lógica de diferencia/transacción/validación NO depende de esa firma.
- */
-import { crearEntrada } from "@/lib/inventario/entradas";
-import { crearSalida } from "@/lib/inventario/salidas";
-
 type PrismaTransactionClient = Prisma.TransactionClient;
 
 /* ==================================================
@@ -120,7 +104,7 @@ export async function aplicarInventarioFisico(
     for (const item of items) {
       const producto = await tx.producto.findUnique({
         where: { id: item.productoId },
-        select: { id: true, nombre: true, stock: true },
+        select: { id: true, nombre: true, stock: true, manejaLotes: true },
       });
 
       if (!producto) {
@@ -137,23 +121,10 @@ export async function aplicarInventarioFisico(
       }
 
       if (diferencia > 0) {
-        // ⚠️ Ajusta esta llamada a la firma real de tu servicio de Entradas.
-        await crearEntrada(tx, {
-          productoId: producto.id,
-          cantidad: diferencia,
-          motivo: MOTIVO_AJUSTE,
-          referencia: REFERENCIA_AJUSTE,
-        });
+        await registrarEntrada(tx, producto, diferencia);
         entradas++;
       } else {
-        // ⚠️ Ajusta esta llamada a la firma real de tu servicio de Salidas
-        // (debe seguir usando FIFO tal cual funciona hoy).
-        await crearSalida(tx, {
-          productoId: producto.id,
-          cantidad: Math.abs(diferencia),
-          motivo: MOTIVO_AJUSTE,
-          referencia: REFERENCIA_AJUSTE,
-        });
+        await registrarSalida(tx, producto, Math.abs(diferencia));
         salidas++;
       }
     }
@@ -165,4 +136,71 @@ export async function aplicarInventarioFisico(
     salidas,
     sinCambios,
   };
+}
+
+/* ==================================================
+   REGISTRO DIRECTO DE ENTRADA / SALIDA
+   ⚠️ Nombres de campos (`entrada.create`, `salida.create`) son mi mejor
+   suposición porque no tengo tu schema.prisma. Ajústalos si tus modelos
+   Entrada/Salida usan otros nombres de columnas.
+================================================== */
+
+async function registrarEntrada(
+  tx: PrismaTransactionClient,
+  producto: { id: number; manejaLotes: boolean },
+  cantidad: number
+): Promise<void> {
+  // TODO(lotes): si `producto.manejaLotes` es true, aquí también debería
+  // crearse el registro correspondiente en `InventarioLote` (fecha de
+  // entrada, cantidad, cantidadDisponible = cantidad) para que el FIFO de
+  // Salidas lo pueda consumir después. No tengo ese modelo, así que hoy
+  // esta función NO crea el lote. Pásame tu modelo InventarioLote y lo
+  // agrego aquí.
+  await tx.entrada.create({
+    data: {
+      productoId: producto.id,
+      cantidad,
+      fecha: new Date(),
+      motivo: MOTIVO_AJUSTE,
+      referencia: REFERENCIA_AJUSTE,
+    },
+  });
+
+  await tx.producto.update({
+    where: { id: producto.id },
+    data: { stock: { increment: cantidad } },
+  });
+}
+
+async function registrarSalida(
+  tx: PrismaTransactionClient,
+  producto: { id: number; manejaLotes: boolean },
+  cantidad: number
+): Promise<void> {
+  if (producto.manejaLotes) {
+    // No tengo el modelo `InventarioLote`, así que NO voy a inventar un
+    // consumo FIFO y arriesgarme a corromper el historial de lotes de un
+    // producto que sí lo usa. Mejor frenar aquí con un error claro que
+    // dejar datos mal calculados. Pásame el modelo InventarioLote de tu
+    // schema.prisma (campos de fecha de entrada, cantidad, cantidad
+    // disponible) y completo el consumo FIFO real.
+    throw new AplicarInventarioFisicoError(
+      `El producto "${producto.id}" maneja lotes (FIFO). El consumo automático de lotes en Salidas aún no está integrado en este servicio.`
+    );
+  }
+
+  await tx.salida.create({
+    data: {
+      productoId: producto.id,
+      cantidad,
+      fecha: new Date(),
+      motivo: MOTIVO_AJUSTE,
+      referencia: REFERENCIA_AJUSTE,
+    },
+  });
+
+  await tx.producto.update({
+    where: { id: producto.id },
+    data: { stock: { decrement: cantidad } },
+  });
 }
