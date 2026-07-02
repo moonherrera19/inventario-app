@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export interface ProductoInventarioFisico {
-  id: string;
+  id: number;
   nombre: string;
   unidad: string;
   stock: number;

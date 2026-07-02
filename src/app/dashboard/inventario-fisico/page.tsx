@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 ================================================== */
 
 interface ProductoInventario {
-  id: string;
+  id: number;
   nombre: string;
   unidad: string;
   stock: number;
@@ -124,7 +124,7 @@ export default function InventarioFisicoPage() {
   const [cargando, setCargando] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [conteos, setConteos] = useState<Record<string, ConteoEntry>>({});
+  const [conteos, setConteos] = useState<Record<number, ConteoEntry>>({});
 
   const [filtros, setFiltros] = useState<Filtros>({
     buscar: "",
@@ -182,7 +182,7 @@ export default function InventarioFisicoPage() {
 
   /* -------------------- ACCIONES -------------------- */
 
-  function actualizarConteo(id: string, valorCrudo: string): void {
+  function actualizarConteo(id: number, valorCrudo: string): void {
     const valor = sanitizarConteo(valorCrudo);
 
     setConteos((prev) => ({
@@ -194,7 +194,7 @@ export default function InventarioFisicoPage() {
     }));
   }
 
-  function actualizarRevisado(id: string, revisado: boolean): void {
+  function actualizarRevisado(id: number, revisado: boolean): void {
     setConteos((prev) => ({
       ...prev,
       [id]: {
