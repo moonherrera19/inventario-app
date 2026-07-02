@@ -4,6 +4,21 @@ import { useEffect, useState, useTransition } from "react";
 import ModalProducto from "@/components/productos/ModalProducto";
 import ModalImportProductos from "@/components/modals/ModalImportProductos";
 
+// ============================================================
+// Utilidad: limpia errores de precisión flotante
+// Ejemplos:
+//   3.552e-15  →  "0"
+//   15.5       →  "15.50"
+//   0          →  "0"
+//   100        →  "100.00"
+// ============================================================
+function formatStock(value: number | string | null | undefined): string {
+  const n = Number(value);
+  if (isNaN(n)) return "0";
+  if (Math.abs(n) < 0.0001) return "0";
+  return n.toFixed(2);
+}
+
 export default function ProductosPage() {
   const [productos, setProductos] = useState<any[]>([]);
   const [productosFiltrados, setProductosFiltrados] = useState<any[]>([]);
@@ -22,7 +37,6 @@ export default function ProductosPage() {
     setLoading(true);
     const res = await fetch("/api/productos");
     const json = await res.json();
-
     setProductos(json);
     setProductosFiltrados(json);
     setLoading(false);
@@ -43,7 +57,6 @@ export default function ProductosPage() {
 
   const eliminarProducto = async (id: number) => {
     if (!confirm("¿Eliminar producto?")) return;
-
     startTransition(async () => {
       await fetch(`/api/productos?id=${id}`, { method: "DELETE" });
       cargarProductos();
@@ -99,7 +112,7 @@ export default function ProductosPage() {
         />
       </div>
 
-      {/* CONTENEDOR SCROLLEABLE */}
+      {/* TABLA */}
       <div className="flex-1 overflow-auto bg-[#1a1f25] p-4 rounded-xl border border-green-800/40 shadow-lg">
         {loading ? (
           <p className="text-gray-400">Cargando productos...</p>
@@ -121,51 +134,69 @@ export default function ProductosPage() {
               </thead>
 
               <tbody>
-                {productosFiltrados.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="border-b border-green-800/20 hover:bg-green-900/10 transition"
-                  >
-                    <td className="py-3">{p.id}</td>
-                    <td className="py-3 text-green-300 font-semibold">{p.nombre}</td>
-                    <td className="py-3">{p.unidad}</td>
+                {productosFiltrados.map((p) => {
+                  // ── Calcular stock limpio una sola vez por fila ──
+                  const stockMinimo = Number(p.stockMinimo ?? 0);
+                  const stockReal = Number(p.stock ?? 0);
+                  const stockBajo =
+                    Math.abs(stockReal) < 0.0001
+                      ? stockMinimo > 0        // si stock es ~0 y hay mínimo → bajo
+                      : stockReal <= stockMinimo;
 
-                    {/* COLOR PARA STOCK BAJO */}
-                    <td
-                      className={`py-3 font-bold ${
-                        p.stock <= (p.stockMinimo || 0)
-                          ? "text-red-400"
-                          : "text-green-200"
-                      }`}
+                  return (
+                    <tr
+                      key={p.id}
+                      className="border-b border-green-800/20 hover:bg-green-900/10 transition"
                     >
-                      {p.stock}
-                    </td>
+                      {/* ID */}
+                      <td className="py-3">{p.id}</td>
 
-                    <td className="py-3">{p.categoria?.nombre || "-"}</td>
-                    <td className="py-3">{p.proveedor?.nombre || "-"}</td>
+                      {/* Nombre */}
+                      <td className="py-3 text-green-300 font-semibold">
+                        {p.nombre}
+                      </td>
 
-                    <td className="py-3 flex gap-2 justify-center">
-                      <button
-                        className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md"
-                        onClick={() => {
-                          setEditData(p);
-                          setOpenModal(true);
-                        }}
+                      {/* Unidad */}
+                      <td className="py-3">{p.unidad}</td>
+
+                      {/* ── STOCK CORREGIDO ── */}
+                      <td
+                        className={`py-3 font-bold ${
+                          stockBajo ? "text-red-400" : "text-green-200"
+                        }`}
                       >
-                        Editar
-                      </button>
+                        {formatStock(p.stock)}
+                      </td>
 
-                      <button
-                        className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md"
-                        onClick={() => eliminarProducto(p.id)}
-                      >
-                        Eliminar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Categoría */}
+                      <td className="py-3">{p.categoria?.nombre || "-"}</td>
+
+                      {/* Proveedor */}
+                      <td className="py-3">{p.proveedor?.nombre || "-"}</td>
+
+                      {/* Acciones */}
+                      <td className="py-3 flex gap-2 justify-center">
+                        <button
+                          className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md"
+                          onClick={() => {
+                            setEditData(p);
+                            setOpenModal(true);
+                          }}
+                        >
+                          Editar
+                        </button>
+
+                        <button
+                          className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md"
+                          onClick={() => eliminarProducto(p.id)}
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
-
             </table>
           </div>
         )}
@@ -180,7 +211,7 @@ export default function ProductosPage() {
         />
       )}
 
-      {/* MODAL DE IMPORTACIÓN */}
+      {/* MODAL IMPORTACIÓN */}
       {openImport && (
         <ModalImportProductos
           isOpen={openImport}
