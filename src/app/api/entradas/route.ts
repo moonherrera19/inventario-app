@@ -2,65 +2,153 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // =====================================================
-// PUT → EDITAR SOLO LA FECHA DE UNA SALIDA
-//
-// IMPORTANTE:
-// Este endpoint es independiente del PUT que ya existe en
-// /api/salidas (route.ts de colección), el cual edita
-// cantidad/rancho/cultivo y ajusta stock/lotes. Este NO.
-// Este endpoint únicamente actualiza el campo `fecha` de la
-// Salida. No toca Producto.stock, no toca InventarioLote,
-// no recalcula FIFO, no crea ni elimina movimientos.
+// GET → LISTAR ENTRADAS
 // =====================================================
-export async function PUT(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET() {
   try {
-    const { id } = await params;
-    const { fecha } = await req.json();
-
-    if (!id || isNaN(Number(id))) {
-      return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-    }
-
-    if (!fecha) {
-      return NextResponse.json(
-        { error: "La fecha es obligatoria" },
-        { status: 400 }
-      );
-    }
-
-    const nuevaFecha = new Date(fecha);
-
-    if (isNaN(nuevaFecha.getTime())) {
-      return NextResponse.json(
-        { error: "Fecha inválida" },
-        { status: 400 }
-      );
-    }
-
-    const salidaExistente = await prisma.salida.findUnique({
-      where: { id: Number(id) },
+    const entradas = await prisma.entrada.findMany({
+      orderBy: { id: "desc" },
+      include: {
+        producto: true,
+      },
     });
 
-    if (!salidaExistente) {
+    return NextResponse.json(entradas);
+  } catch (error) {
+    console.error("❌ Error GET entradas:", error);
+    return NextResponse.json(
+      { error: "Error al obtener entradas" },
+      { status: 500 }
+    );
+  }
+}
+
+// =====================================================
+// POST → REGISTRAR ENTRADA
+// LÓGICA:
+// - manejaLotes = false → sumar stock directo
+// - manejaLotes = true  → crear InventarioLote
+// =====================================================
+export async function POST(req: Request) {
+  try {
+    const {
+      productoId,
+      cantidad,
+      loteCodigo,
+      fechaCaducidad,
+    } = await req.json();
+
+    if (!productoId || !cantidad || Number(cantidad) <= 0) {
       return NextResponse.json(
-        { error: "Salida no encontrada" },
+        { error: "Producto y cantidad válidos son obligatorios" },
+        { status: 400 }
+      );
+    }
+
+    const producto = await prisma.producto.findUnique({
+      where: { id: Number(productoId) },
+    });
+
+    if (!producto) {
+      return NextResponse.json(
+        { error: "Producto no encontrado" },
         { status: 404 }
       );
     }
 
-    const salidaActualizada = await prisma.salida.update({
-      where: { id: Number(id) },
-      data: { fecha: nuevaFecha },
+    // ==================================================
+    // 🟢 CASO 1: PRODUCTO NO MANEJA LOTES
+    // ==================================================
+    if (!producto.manejaLotes) {
+
+      await prisma.$transaction(async (tx) => {
+        // 1️⃣ Registrar entrada (histórico)
+        await tx.entrada.create({
+          data: {
+            productoId: producto.id,
+            cantidad: Number(cantidad),
+          },
+        });
+
+        // 2️⃣ Sumar stock general
+        await tx.producto.update({
+          where: { id: producto.id },
+          data: {
+            stock: {
+              increment: Number(cantidad),
+            },
+          },
+        });
+      });
+
+      return NextResponse.json(
+        {
+          ok: true,
+          tipo: "DIRECTA",
+          message: "Entrada registrada sin lote",
+        },
+        { status: 201 }
+      );
+    }
+
+    // ==================================================
+    // 🔵 CASO 2: PRODUCTO MANEJA LOTES
+    // ==================================================
+    if (!loteCodigo) {
+      return NextResponse.json(
+        { error: "Lote obligatorio para este producto" },
+        { status: 400 }
+      );
+    }
+
+    const resultado = await prisma.$transaction(async (tx) => {
+      // 1️⃣ Crear lote
+      const inventarioLote = await tx.inventarioLote.create({
+        data: {
+          productoId: producto.id,
+          loteCodigo,
+          fechaCaducidad: fechaCaducidad
+            ? new Date(fechaCaducidad)
+            : null,
+          cantidadDisponible: Number(cantidad),
+        },
+      });
+
+      // 2️⃣ Registrar entrada
+      const entrada = await tx.entrada.create({
+        data: {
+          productoId: producto.id,
+          cantidad: Number(cantidad),
+        },
+      });
+
+      // 3️⃣ Actualizar stock general
+      await tx.producto.update({
+        where: { id: producto.id },
+        data: {
+          stock: {
+            increment: Number(cantidad),
+          },
+        },
+      });
+
+      return { entrada, inventarioLote };
     });
 
-    return NextResponse.json(salidaActualizada);
-  } catch (error: any) {
-    console.error("❌ Error PUT salida [id]:", error);
     return NextResponse.json(
-      { error: error.message || "Error al actualizar la fecha de la salida" },
+      {
+        ok: true,
+        tipo: "LOTE",
+        message: "Entrada registrada con lote",
+        ...resultado,
+      },
+      { status: 201 }
+    );
+
+  } catch (error: any) {
+    console.error("❌ Error POST entradas:", error);
+    return NextResponse.json(
+      { error: error.message || "Error al registrar la entrada" },
       { status: 500 }
     );
   }
