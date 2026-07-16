@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import ModalSalida from "@/components/salidas/ModalSalida";
 import ModalEditarSalida from "@/components/salidas/ModalEditarSalida";
+import ModalEditarFechaSalida from "@/components/salidas/ModalEditarFechaSalida";
 
 // ==============================
 // TIPADO
@@ -31,9 +32,13 @@ export default function SalidasPage() {
   const [productos, setProductos] = useState<ProductoType[]>([]);
   const [openModal, setOpenModal] = useState(false);
 
-  // MODAL EDITAR
+  // MODAL EDITAR (completo, existente)
   const [openEdit, setOpenEdit] = useState(false);
   const [editData, setEditData] = useState<SalidaType | null>(null);
+
+  // MODAL EDITAR FECHA (nuevo, independiente)
+  const [openEditFecha, setOpenEditFecha] = useState(false);
+  const [editFechaData, setEditFechaData] = useState<SalidaType | null>(null);
 
   // FILTROS
   const [filtroRancho, setFiltroRancho] = useState("");
@@ -71,11 +76,19 @@ export default function SalidasPage() {
   }, []);
 
   // ============================
-  // EDITAR
+  // EDITAR (completo, existente)
   // ============================
   const abrirModalEditar = (salida: SalidaType) => {
     setEditData(salida);
     setOpenEdit(true);
+  };
+
+  // ============================
+  // EDITAR FECHA (nuevo)
+  // ============================
+  const abrirModalEditarFecha = (salida: SalidaType) => {
+    setEditFechaData(salida);
+    setOpenEditFecha(true);
   };
 
   // ============================
@@ -112,12 +125,23 @@ export default function SalidasPage() {
         productos={productos}
       />
 
-      {/* MODAL EDITAR */}
+      {/* MODAL EDITAR (completo, existente) */}
       {openEdit && editData && (
         <ModalEditarSalida
           open={openEdit}
           onClose={() => setOpenEdit(false)}
           data={editData}
+          refresh={cargarSalidas}
+        />
+      )}
+
+      {/* MODAL EDITAR FECHA (nuevo, independiente) */}
+      {openEditFecha && editFechaData && (
+        <ModalEditarFechaSalida
+          open={openEditFecha}
+          onClose={() => setOpenEditFecha(false)}
+          salidaId={editFechaData.id}
+          fechaActual={editFechaData.fecha}
           refresh={cargarSalidas}
         />
       )}
@@ -171,12 +195,19 @@ export default function SalidasPage() {
                 <td className="py-2 font-semibold text-red-400">
                   {s.cantidad}
                 </td>
-                <td className="py-2">
+                <td className="py-2 flex gap-2">
                   <button
                     onClick={() => abrirModalEditar(s)}
                     className="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-white"
                   >
                     Editar
+                  </button>
+                  <button
+                    onClick={() => abrirModalEditarFecha(s)}
+                    title="Editar fecha"
+                    className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white"
+                  >
+                    📅
                   </button>
                 </td>
               </tr>

@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { procesarEntrada } from "@/lib/inventario/procesarEntrada";
+import { procesarSalida } from "@/lib/inventario/procesarSalida";
 
 type PrismaTransactionClient = Prisma.TransactionClient;
 
@@ -26,8 +28,13 @@ export class AplicarInventarioFisicoError extends Error {
   }
 }
 
-const MOTIVO_AJUSTE = "Ajuste por Inventario Físico";
-const REFERENCIA_AJUSTE = "inventario-fisico";
+// Tolerancia para comparar floats (evita falsos "Entrada"/"Salida" por
+// errores de redondeo de punto flotante en el conteo capturado).
+const TOLERANCIA_DIFERENCIA = 0.0001;
+
+// Texto usado para identificar en reportes las Salidas generadas por este
+// módulo (Salida.cultivo es un campo libre, no crea un motivo nuevo en BD).
+const CULTIVO_AJUSTE = "Ajuste de Inventario Físico";
 
 /* ==================================================
    VALIDACIÓN
@@ -79,14 +86,29 @@ function validarItems(items: ItemAjusteInventario[]): void {
 }
 
 /* ==================================================
+   HELPERS
+================================================== */
+
+// Código de lote determinístico para Entradas de ajuste en productos que
+// manejan lotes (procesarEntrada exige loteCodigo cuando manejaLotes=true).
+// Cambia este formato si tu operación ya tiene otra convención de códigos.
+function generarLoteCodigoAjuste(productoId: number): string {
+  const fecha = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return `AJUSTE-${productoId}-${fecha}`;
+}
+
+/* ==================================================
    SERVICIO PRINCIPAL
 ================================================== */
 
 /**
  * Recorre los productos revisados, compara Conteo vs Stock del sistema y
- * crea Entradas o Salidas usando el motor existente. Nunca escribe en
- * `Producto.stock` ni en `InventarioLote` directamente: eso lo sigue
- * haciendo el motor de Entradas/Salidas, como ya funciona hoy.
+ * crea Entradas o Salidas llamando al motor real ya existente
+ * (procesarEntrada / procesarSalida). Este archivo NUNCA escribe en
+ * `Producto.stock` ni en `InventarioLote` directamente ni crea registros
+ * de Entrada/Salida a mano: toda esa lógica (incluido el consumo FIFO de
+ * lotes) la sigue haciendo exactamente el mismo código que usan los
+ * endpoints manuales de Entradas y Salidas.
  *
  * Todo corre dentro de una única transacción: si un producto falla,
  * se hace ROLLBACK y no se aplica ningún cambio.
@@ -104,7 +126,12 @@ export async function aplicarInventarioFisico(
     for (const item of items) {
       const producto = await tx.producto.findUnique({
         where: { id: item.productoId },
-        select: { id: true, nombre: true, stock: true, manejaLotes: true },
+        select: {
+          id: true,
+          nombre: true,
+          stock: true,
+          manejaLotes: true,
+        },
       });
 
       if (!producto) {
@@ -115,16 +142,26 @@ export async function aplicarInventarioFisico(
 
       const diferencia = item.conteoFisico - producto.stock;
 
-      if (diferencia === 0) {
+      if (Math.abs(diferencia) < TOLERANCIA_DIFERENCIA) {
         sinCambios++;
         continue;
       }
 
       if (diferencia > 0) {
-        await registrarEntrada(tx, producto, diferencia);
+        await procesarEntrada(tx, {
+          productoId: producto.id,
+          cantidad: diferencia,
+          loteCodigo: producto.manejaLotes
+            ? generarLoteCodigoAjuste(producto.id)
+            : undefined,
+        });
         entradas++;
       } else {
-        await registrarSalida(tx, producto, Math.abs(diferencia));
+        await procesarSalida(tx, {
+          productoId: producto.id,
+          cantidad: Math.abs(diferencia),
+          cultivo: CULTIVO_AJUSTE,
+        });
         salidas++;
       }
     }
@@ -136,71 +173,4 @@ export async function aplicarInventarioFisico(
     salidas,
     sinCambios,
   };
-}
-
-/* ==================================================
-   REGISTRO DIRECTO DE ENTRADA / SALIDA
-   ⚠️ Nombres de campos (`entrada.create`, `salida.create`) son mi mejor
-   suposición porque no tengo tu schema.prisma. Ajústalos si tus modelos
-   Entrada/Salida usan otros nombres de columnas.
-================================================== */
-
-async function registrarEntrada(
-  tx: PrismaTransactionClient,
-  producto: { id: number; manejaLotes: boolean },
-  cantidad: number
-): Promise<void> {
-  // TODO(lotes): si `producto.manejaLotes` es true, aquí también debería
-  // crearse el registro correspondiente en `InventarioLote` (fecha de
-  // entrada, cantidad, cantidadDisponible = cantidad) para que el FIFO de
-  // Salidas lo pueda consumir después. No tengo ese modelo, así que hoy
-  // esta función NO crea el lote. Pásame tu modelo InventarioLote y lo
-  // agrego aquí.
-  await tx.entrada.create({
-    data: {
-      productoId: producto.id,
-      cantidad,
-      fecha: new Date(),
-      motivo: MOTIVO_AJUSTE,
-      referencia: REFERENCIA_AJUSTE,
-    },
-  });
-
-  await tx.producto.update({
-    where: { id: producto.id },
-    data: { stock: { increment: cantidad } },
-  });
-}
-
-async function registrarSalida(
-  tx: PrismaTransactionClient,
-  producto: { id: number; manejaLotes: boolean },
-  cantidad: number
-): Promise<void> {
-  if (producto.manejaLotes) {
-    // No tengo el modelo `InventarioLote`, así que NO voy a inventar un
-    // consumo FIFO y arriesgarme a corromper el historial de lotes de un
-    // producto que sí lo usa. Mejor frenar aquí con un error claro que
-    // dejar datos mal calculados. Pásame el modelo InventarioLote de tu
-    // schema.prisma (campos de fecha de entrada, cantidad, cantidad
-    // disponible) y completo el consumo FIFO real.
-    throw new AplicarInventarioFisicoError(
-      `El producto "${producto.id}" maneja lotes (FIFO). El consumo automático de lotes en Salidas aún no está integrado en este servicio.`
-    );
-  }
-
-  await tx.salida.create({
-    data: {
-      productoId: producto.id,
-      cantidad,
-      fecha: new Date(),
-      motivo: MOTIVO_AJUSTE,
-      referencia: REFERENCIA_AJUSTE,
-    },
-  });
-
-  await tx.producto.update({
-    where: { id: producto.id },
-    data: { stock: { decrement: cantidad } },
-  });
 }
